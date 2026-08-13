@@ -133,16 +133,16 @@ function walkFiles(dir, ext) {
   return out;
 }
 
-/** Normaliza nomes de camada (varia por convenção/linguagem) para grupos canônicos. */
+/** Normaliza nomes de camada (varia por convenção/idioma) para grupos canônicos. EN + PT-BR. */
 function canonGroup(name) {
   const n = String(name || '').toLowerCase();
-  if (/^(service|services)$/.test(n)) return 'services';
-  if (/^(integration|integrations|adapter|adapters|client|clients|gateway|gateways|external|externals)$/.test(n)) return 'integrations';
-  if (/^(model|models|entity|entities|domain|repository|repositories|dao|persistence)$/.test(n)) return 'models';
-  if (/^(db|database|migration|migrations)$/.test(n)) return 'db';
-  if (/^(api|controller|controllers|rest|resource|resources|route|routes|handler|handlers)$/.test(n)) return 'api';
-  if (/^(web|ui|view|views|template|templates|frontend)$/.test(n)) return 'web';
-  if (/^(config|configuration|settings)$/.test(n)) return 'config';
+  if (/^(service|services|servico|servicos|negocio|negocios|dominio|aplicacao|regra|regras|caso|casos)$/.test(n)) return 'services';
+  if (/^(integration|integrations|integracao|integracoes|adapter|adapters|adaptador|adaptadores|client|clients|cliente|clientes|gateway|gateways|external|externals|externo|externos)$/.test(n)) return 'integrations';
+  if (/^(model|models|modelo|modelos|entity|entities|entidade|entidades|domain|repository|repositories|repositorio|repositorios|dao|persistence|persistencia|dto|vo|dados|dado)$/.test(n)) return 'models';
+  if (/^(db|database|banco|migration|migrations)$/.test(n)) return 'db';
+  if (/^(api|controller|controllers|controle|controles|controlador|controladores|rest|resource|resources|recurso|recursos|route|routes|rota|rotas|handler|handlers|endpoint|endpoints)$/.test(n)) return 'api';
+  if (/^(web|ui|view|views|visao|visoes|tela|telas|template|templates|frontend)$/.test(n)) return 'web';
+  if (/^(config|configuration|configuracao|configuracoes|settings)$/.test(n)) return 'config';
   return n || null;
 }
 
@@ -236,6 +236,12 @@ function buildArchFromSource(scan, meta) {
   apiFiles.forEach(a => a.imports.forEach(i => { if (i.group === 'services' && i.name) { link('api', 'svc_' + i.name); incoming.add('svc_' + i.name); } }));
   // qualquer serviço sem entrada liga no backbone (API ou nó acima)
   svcFiles.forEach(s => { const id = 'svc_' + s.module; if (!incoming.has(id)) link(hasApi ? 'api' : up, id); });
+  // sem camada de serviços: liga adapters/dados direto ao backbone para não ficarem soltos
+  const backbone = svcFiles.length ? null : up;
+  if (backbone) {
+    intNames.forEach(n => { if (!incoming.has('int_' + n)) link(backbone, 'int_' + n); });
+    if (hasData && !incoming.has('data')) link(backbone, 'data');
+  }
 
   const seen = new Set();
   const uniq = links.filter(([a, b]) => { const k = a + '|' + b; if (seen.has(k)) return false; seen.add(k); return true; });
@@ -267,20 +273,25 @@ function buildArchHeuristic(tasks, meta) {
  * Deriva a arquitetura. Se houver código Python em <projeto>/src, lê os imports
  * e liga cada serviço ao adapter/modelo real; senão, cai no heurístico (só specs).
  */
-export function buildArch(tasks, specDir) {
+export function buildArch(tasks, specDir, srcOverride) {
   const meta = planFields(specDir);
   const projectRoot = path.resolve(specDir, '..', '..'); // specs/<slug> -> raiz do projeto
-  const src = path.join(projectRoot, 'src');
+  const src = srcOverride ? path.resolve(srcOverride) : path.join(projectRoot, 'src');
   const scan = scanPythonSource(src) || scanJavaSource(src);
-  if (scan && scan.files.some(f => f.group === 'services')) {
+  const STRUCT = new Set(['services', 'api', 'integrations', 'models', 'web', 'db']);
+  if (scan && scan.files.some(f => STRUCT.has(f.group))) {
     if (!meta.language && scan.lang) meta.language = scan.lang;
     return buildArchFromSource(scan, meta);
   }
   return buildArchHeuristic(tasks, meta);
 }
 
-/** Descobre e faz o parse de todos os specs/<slug>/ sob specsDir. */
-export function parseSpecs(specsDir) {
+/**
+ * Descobre e faz o parse de todos os specs/<slug>/ sob specsDir.
+ * opts.src: pasta de código para a arquitetura (override; útil em monorepos,
+ * para escopar a varredura só à feature em vez do src/ inteiro).
+ */
+export function parseSpecs(specsDir, opts = {}) {
   if (!fs.existsSync(specsDir)) {
     throw new Error(`Diretório de specs não encontrado: ${specsDir}`);
   }
@@ -297,7 +308,7 @@ export function parseSpecs(specsDir) {
       usecases: spec.usecases,
       actors: spec.actors,
       frText: spec.frText,
-      arch: buildArch(tasks, dir),
+      arch: buildArch(tasks, dir, opts.src),
     };
   }
   if (Object.keys(out).length === 0) {

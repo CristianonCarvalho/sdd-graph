@@ -128,8 +128,9 @@ function cmdGenerate(flags) {
   const project = flags.project || deriveProjectName(specsDir);
   const out = path.resolve(flags.out || 'speckit-graph.html');
   const selfContained = !flags.cdn;
+  const src = flags.src ? path.resolve(flags.src) : null; // escopo do código p/ arquitetura (monorepo)
 
-  const data = parseSpecs(specsDir);
+  const data = parseSpecs(specsDir, { src });
   const html = renderHTML(data, { project, selfContained });
   fs.writeFileSync(out, html);
 
@@ -137,10 +138,11 @@ function cmdGenerate(flags) {
   const totals = specs.map(s => {
     const { tasks, usecases, arch } = data[s];
     const e = tasks.reduce((a, x) => a + x.deps.length, 0);
-    return `  · ${s}: ${tasks.length} tasks (${e} deps), ${usecases.length} casos de uso, ${arch.nodes.length} componentes`;
+    return `  · ${s}: ${tasks.length} tasks (${e} deps), ${usecases.length} casos de uso, ${arch.nodes.length} componentes${arch.source ? ' [código]' : ' [heurístico]'}`;
   }).join('\n');
   console.log(`✓ Grafo gerado: ${out}`);
   console.log(`  Specs (${specs.length}):\n${totals}`);
+  if (src) console.log(`  Arquitetura escopada a: ${src}`);
   console.log(`  Modo: ${selfContained ? 'self-contained (offline)' : 'CDN'}`);
   if (flags.open) { openFile(out); console.log('  Abrindo no navegador…'); }
 }
@@ -155,6 +157,8 @@ function main() {
 
   speckit-graph [opções]        gera o HTML (3 abas)
     --specs <dir>   diretório de specs (default: ./specs autodetectado)
+    --src <dir>     pasta de código p/ a aba Arquitetura (default: <raiz>/src)
+                    use em monorepo p/ escopar só à feature (ex.: src/gov/rfb/consulta)
     --out <arquivo> saída (default: ./speckit-graph.html)
     --project <nome> nome exibido no cabeçalho
     --cdn           usa D3 via CDN em vez de embutir (arquivo menor, precisa de internet)
