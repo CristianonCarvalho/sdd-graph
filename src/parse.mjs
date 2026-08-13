@@ -149,18 +149,29 @@ function canonGroup(name) {
   return n || null;
 }
 
-/** Python: imports internos `from src.a.b …`. */
+/** Python: imports internos absolutos (`from src.a.b`) e relativos (`from ..a.b`). */
 function scanPythonSource(srcDir) {
   if (!fs.existsSync(srcDir)) return null;
   const files = walkFiles(srcDir, '.py').filter(f => !f.endsWith('__init__.py'));
   if (!files.length) return null;
-  const tgt = dotted => { const p = dotted.split('.').slice(1); return { group: canonGroup(p[0]), name: p[1] }; };
   const out = files.map(abs => {
     const parts = path.relative(srcDir, abs).replace(/\.py$/, '').split(path.sep);
+    const dirParts = parts.slice(0, -1);
     const text = fs.readFileSync(abs, 'utf8');
     const imports = [];
-    const re = /^\s*(?:from|import)\s+(src\.[\w.]+)/gm;
-    let m; while ((m = re.exec(text)) !== null) imports.push(tgt(m[1]));
+    let m;
+    // absolutos: from src.a.b … / import src.a.b  (proveniência exata)
+    const reAbs = /^\s*(?:from|import)\s+(src\.[\w.]+)/gm;
+    while ((m = reAbs.exec(text)) !== null) { const p = m[1].split('.').slice(1); imports.push({ group: canonGroup(p[0]), name: p[1], prov: 'exact' }); }
+    // relativos: from ..a.b import x  (resolvidos contra o caminho do arquivo; proveniência inferida)
+    const reRel = /^\s*from\s+(\.+)([\w.]*)\s+import/gm;
+    while ((m = reRel.exec(text)) !== null) {
+      const up = m[1].length - 1, mod = m[2];
+      if (!mod) continue;
+      if (up > dirParts.length) { imports.push({ group: null, name: null, prov: 'unresolved' }); continue; }
+      const seg = dirParts.slice(0, dirParts.length - up).concat(mod.split('.'));
+      imports.push({ group: canonGroup(seg[0]), name: seg[1], prov: 'inferred' });
+    }
     return { group: canonGroup(parts[0]), sub: parts.length > 2 ? parts[1] : null, module: parts[parts.length - 1], imports };
   });
   return { files: out, lang: 'Python' };
@@ -191,7 +202,7 @@ function scanJavaSource(srcRoot) {
   const out = parsed.map(p => {
     const rem = p.seg.slice(bl);
     const imports = p.imports.map(s => s.split('.')).filter(inBase)
-      .map(segs => ({ group: canonGroup(segs[bl]), name: segs[bl + 1] }));
+      .map(segs => ({ group: canonGroup(segs[bl]), name: segs[bl + 1], prov: 'exact' }));
     return { group: canonGroup(rem[0]), sub: rem[1] || null, module: p.cls, imports };
   });
   return { files: out, lang: 'Java', baseAmbiguous };
@@ -226,15 +237,19 @@ function buildArchFromSource(scan, meta) {
   }
   if (groups.has('config')) { add('cfg', 'Config', 'config', 2); if (hasApi) link('cfg', 'api'); }
 
-  // arestas por import real
+  // arestas por import real (com contagem de proveniência p/ o índice de confiança)
   const incoming = new Set();
+  const ie = { exact: 0, inferred: 0, unresolved: 0 };
   const emit = (from, to) => { link(from, to); incoming.add(to); };
   svcFiles.forEach(s => {
     const id = 'svc_' + s.module;
     s.imports.forEach(i => {
-      if (i.group === 'integrations' && i.name) emit(id, 'int_' + i.name);
-      else if ((i.group === 'models' || i.group === 'db') && hasData) emit(id, 'data');
-      else if (i.group === 'services' && i.name && i.name !== s.module) emit(id, 'svc_' + i.name);
+      if (i.prov === 'unresolved') { ie.unresolved++; return; }
+      let emitted = false;
+      if (i.group === 'integrations' && i.name) { emit(id, 'int_' + i.name); emitted = true; }
+      else if ((i.group === 'models' || i.group === 'db') && hasData) { emit(id, 'data'); emitted = true; }
+      else if (i.group === 'services' && i.name && i.name !== s.module) { emit(id, 'svc_' + i.name); emitted = true; }
+      if (emitted) (i.prov === 'inferred' ? ie.inferred++ : ie.exact++);
     });
   });
   // API → serviços que a API importa
@@ -250,7 +265,7 @@ function buildArchFromSource(scan, meta) {
 
   const seen = new Set();
   const uniq = links.filter(([a, b]) => { const k = a + '|' + b; if (seen.has(k)) return false; seen.add(k); return true; });
-  return { nodes, links: uniq, meta, source: true, baseAmbiguous: !!scan.baseAmbiguous };
+  return { nodes, links: uniq, meta, source: true, baseAmbiguous: !!scan.baseAmbiguous, provenance: { imports: ie } };
 }
 
 /** Arquitetura HEURÍSTICA (fallback): só specs, sem ler código. Serviços como um nó único. */
@@ -328,6 +343,7 @@ export function parseSpecs(specsDir, opts = {}) {
       taskLines: { exact: tasks.length, unmatched: Math.max(0, checkboxLines - tasks.length) },
       depEdges: { resolved, unresolved },
       arch: { source: !!rec.arch.source, baseAmbiguous: !!rec.arch.baseAmbiguous },
+      imports: rec.arch.provenance ? rec.arch.provenance.imports : null,
     };
     rec.confidence = { ...computeConfidence(provenance), provenance };
 

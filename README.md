@@ -5,7 +5,7 @@ Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
 - **Dependências** — grafo dirigido em camadas das tasks: cor = prioridade (P1/P2/P3, Setup, Fundação, Polish), tamanho = quão bloqueante, **caminho crítico** animado. Barra de **progresso** (geral e por prioridade, lida dos checkboxes `- [x]`) e painel **"faça isto a seguir"** com as tasks já desbloqueadas (todas as dependências concluídas); concluídas ganham anel verde, prontas ganham anel âmbar.
 - **Casos de uso** — ator → casos de uso (user stories do `spec.md`, cor por prioridade) → requisitos (FR) que cada um cobre.
-- **Arquitetura** — componentes e fluxo (Web UI → API → Serviços → integrações/modelos → sistemas externos e banco). Se houver código **Python ou Java** em `src/`, **lê os `import`s** e liga cada serviço ao adapter/modelo real (preciso); senão, deriva das pastas + `plan.md` (heurístico). O subtítulo indica qual dos dois. Nomes de camada variados são normalizados (EN + **PT-BR**: service/servico, controller/controle, repository/repositorio, gateway/integracao…). **Monorepo:** use `--src <pasta-da-feature>` para escopar a varredura, senão o pacote-base fica genérico demais e a arquitetura não é reconhecida.
+- **Arquitetura** — componentes e fluxo (Web UI → API → Serviços → integrações/modelos → sistemas externos e banco). Se houver código **Python ou Java** em `src/`, **lê os `import`s** (absolutos e **relativos** em Python, ex.: `from ..integrations.binance import ...`) e liga cada serviço ao adapter/modelo real (preciso); senão, deriva das pastas + `plan.md` (heurístico). O subtítulo indica qual dos dois. Nomes de camada variados são normalizados (EN + **PT-BR**: service/servico, controller/controle, repository/repositorio, gateway/integracao…). **Monorepo:** use `--src <pasta-da-feature>` para escopar a varredura, senão o pacote-base fica genérico demais e a arquitetura não é reconhecida.
 
 Comum às três: hover ilumina a cadeia, clique abre o detalhe, filtro por prioridade, busca e toggle entre specs. **Permalink** (estado da visão no `#hash`, botão "🔗 link"). **Acessibilidade:** forma do nó por prioridade (duplo canal, não só cor), paleta segura para daltonismo (Okabe-Ito), tema claro + modo de impressão, e respeito a `prefers-reduced-motion`.
 
@@ -58,11 +58,12 @@ O diagnóstico também é embutido no HTML (`diagnostics`) para uso futuro na so
 
 ### Índice de confiança
 
-Cada spec recebe um **índice de confiança (0–100)** — uma leitura honesta de "quanto confiar neste grafo", determinística. Aparece como badge no HTML, no `doctor` e no JSON do `check` (`confidenceIndex`). Combina 3 dimensões (peso redistribuído quando uma não se aplica):
+Cada spec recebe um **índice de confiança (0–100)** — uma leitura honesta de "quanto confiar neste grafo", determinística. Aparece como badge no HTML, no `doctor` e no JSON do `check` (`confidenceIndex`). Combina 4 dimensões (peso redistribuído quando uma não se aplica):
 
 - **task** — parsing das tasks (linhas casadas vs. malformadas)
 - **dep** — resolução das dependências (válidas vs. quebradas/auto-referência)
 - **arch** — derivação da arquitetura: lida do código (100%) · base ambígua (75%) · heurística (50%)
+- **import** — resolução dos imports do código: absoluto exato · relativo inferido (crédito parcial) · não resolvido
 
 Ex.: um monorepo sem `--src` cai a ~81% (arquitetura heurística); com `--src` na feature sobe a 100%.
 
