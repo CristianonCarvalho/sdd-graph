@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { parseSpecs } from '../src/parse.mjs';
 import { renderHTML } from '../src/template.mjs';
+import { buildGateReport, stringifyCanonical } from '../src/gate.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -169,12 +170,46 @@ function cmdDoctor(flags) {
   if (flags.strict && totalError > 0) process.exit(1);
 }
 
+function cmdCheck(flags) {
+  let data;
+  try {
+    const specsDir = findSpecsDir(flags.specs);
+    const src = flags.src ? path.resolve(flags.src) : null;
+    data = parseSpecs(specsDir, { src });
+  } catch (e) { console.error('✗ ' + e.message); process.exit(2); }
+
+  const baselinePath = flags.baseline ? path.resolve(flags.baseline) : null;
+  const baseline = new Set();
+  if (baselinePath && fs.existsSync(baselinePath)) {
+    try { (JSON.parse(fs.readFileSync(baselinePath, 'utf8')).fingerprints || []).forEach(f => baseline.add(f)); }
+    catch { console.error(`⚠️  baseline ilegível, ignorando: ${baselinePath}`); }
+  }
+  const gate = flags.gate ? String(flags.gate).split(',').map(s => s.trim()) : ['error'];
+  const { report, passed, fingerprints } = buildGateReport(data, { gate, baseline });
+
+  if (flags['update-baseline']) {
+    const bp = baselinePath || path.resolve('speckit-graph.baseline.json');
+    fs.writeFileSync(bp, stringifyCanonical({ tool: 'speckit-graph', schemaVersion: 1, fingerprints: [...fingerprints].sort() }));
+    console.error(`✓ baseline atualizado: ${bp} (${fingerprints.size} findings)`);
+    process.exit(0);
+  }
+
+  const json = stringifyCanonical(report);
+  if (flags.json) { fs.writeFileSync(path.resolve(flags.json), json); console.error(`✓ JSON: ${path.resolve(flags.json)}`); }
+  else console.log(json); // stdout limpo p/ pipe
+
+  const s = report.summary;
+  console.error(`\n${passed ? '✓ gate PASSOU' : '✗ gate FALHOU'} — ${s.error} erro(s), ${s.warn} aviso(s), ${s.info} info · reprova em: ${gate.join(',')}${baseline.size ? ' · baseline aplicado' : ''}${report.gate.violations ? ` · ${report.gate.violations} violação(ões)` : ''}`);
+  process.exit(passed ? 0 : 1);
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const sub = args._[0];
   try {
     if (sub === 'init') return cmdInit(args.flags);
     if (sub === 'doctor' || args.flags.doctor) return cmdDoctor(args.flags);
+    if (sub === 'check' || args.flags.check) return cmdCheck(args.flags);
     if (sub === 'help' || args.flags.help) {
       console.log(`speckit-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
 
@@ -190,6 +225,13 @@ function main() {
 
   speckit-graph doctor [--specs <dir>] [--src <dir>] [--strict]
     diagnóstico determinístico do plano; --strict sai com código ≠0 se houver erro
+
+  speckit-graph check [opções]   gate de CI: JSON canônico + exit code
+    --json <arquivo>   grava o relatório JSON (default: stdout)
+    --gate <níveis>    severidades que reprovam (default: error; ex.: error,warn)
+    --baseline <path>  reprova só em achados NOVOS vs. baseline (adoção gradual)
+    --update-baseline  (re)grava o baseline com os achados atuais e sai 0
+    exit: 0 passou · 1 reprovou · 2 erro de execução
 
   speckit-graph init [--global] [--target <lista>]
     instala o comando /speckit-graph nas ferramentas de IA

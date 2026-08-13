@@ -1,0 +1,45 @@
+# Exemplo de workflow: roda o gate do speckit-graph em cada PR.
+# Copie para .github/workflows/ no seu projeto SpecKit.
+name: speckit-graph gate
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  plan-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Reprova o merge se o plano tiver ciclos, deps quebradas, ids duplicados etc.
+      # Troque SEU_USUARIO pelo dono do repositório do speckit-graph.
+      - name: Doctor gate
+        run: npx --yes github:CristianonCarvalho/speckit-graph check --json speckit-graph.report.json
+
+      # (opcional) publica o relatório JSON como artefato do build
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: speckit-graph-report
+          path: speckit-graph.report.json
+
+      # (opcional) gera e publica o HTML self-contained para inspeção visual
+      - name: Gera HTML
+        if: always()
+        run: npx --yes github:CristianonCarvalho/speckit-graph --out speckit-graph.html
+      - name: Upload HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: speckit-graph-html
+          path: speckit-graph.html
+
+# Adoção gradual em um plano legado com problemas existentes:
+#   1) rode uma vez:  npx ... check --baseline speckit-graph.baseline.json --update-baseline
+#   2) commite o baseline; o gate passa a reprovar SÓ em problemas NOVOS:
+#      npx ... check --baseline speckit-graph.baseline.json

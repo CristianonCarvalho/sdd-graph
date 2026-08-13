@@ -56,6 +56,28 @@ Regras (id · severidade):
 
 O diagnóstico também é embutido no HTML (`diagnostics`) para uso futuro na sobreposição visual.
 
+## CI Gate — `check` (exit code + JSON)
+
+Embrulha o Doctor para o pipeline: relatório **JSON canônico** (determinístico) e **exit code** para reprovar o merge quando o plano tem problemas.
+
+```bash
+speckit-graph check                       # JSON no stdout; exit 1 se houver erro
+speckit-graph check --json report.json    # grava o JSON
+speckit-graph check --gate error,warn     # também reprova em avisos
+```
+
+Exit: `0` passou · `1` reprovou · `2` erro de execução.
+
+**Adoção gradual (baseline)** — para um plano legado que já tem problemas, aceite o estado atual e passe a reprovar só no que for **novo**:
+
+```bash
+speckit-graph check --baseline sg.baseline.json --update-baseline   # aceita o legado
+git add sg.baseline.json                                            # versione
+speckit-graph check --baseline sg.baseline.json                     # reprova só regressões novas
+```
+
+Cada achado tem um `fingerprint` estável (independe de ordem/posição). Workflow de exemplo do GitHub Actions em [`examples/github/speckit-graph.yml`](examples/github/speckit-graph.yml).
+
 ## Comando /speckit-graph (Claude Code, GitHub Copilot e Kiro)
 
 Instale o comando `/speckit-graph` nas três ferramentas de IA de uma vez:
