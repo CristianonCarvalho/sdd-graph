@@ -133,6 +133,8 @@
       <span class="chip" id="linkBtn" title="copiar link desta visão">🔗 link</span>
       <span class="chip" id="themeBtn" title="tema claro / escuro">◐ tema</span>
       <span class="chip off" id="paletteBtn" title="paleta segura para daltonismo">🎨 paleta</span>
+      <span class="chip" id="pngBtn" title="baixar PNG desta visão">⬇ PNG</span>
+      <span class="chip" id="svgBtn" title="baixar SVG desta visão">⬇ SVG</span>
       <span class="chip" id="critToggle"><span class="sw" style="background:var(--sg-primary)"></span>caminho crítico</span>
       <span class="chip off" id="doneToggle"><span class="sw" style="background:var(--c-p3)"></span>ocultar concluídas</span>
       <span class="chip" id="priBar"></span>
@@ -520,6 +522,35 @@ document.getElementById('themeBtn').onclick=()=>{ const cur=document.documentEle
   cur==='light'?LS.del('sg-theme'):LS.set('sg-theme','light'); applyA11y(); render(true); };
 document.getElementById('paletteBtn').onclick=()=>{ const cur=document.documentElement.getAttribute('data-palette');
   cur==='safe'?LS.del('sg-palette'):LS.set('sg-palette','safe'); applyA11y(); render(true); };
+// export: serializa o SVG visível (com estilos e cores do tema atual) + PNG via canvas
+function svgStyleBlock(){
+  const link=gRoot.select('.link').node(), lc=link?getComputedStyle(link):null;
+  const critEl=gRoot.select('.link.crit').node(), cc=critEl?getComputedStyle(critEl):null;
+  const idEl=gRoot.select('text.id').node(), ic=idEl?getComputedStyle(idEl):null;
+  const shEl=gRoot.select('.node path.sh, .node circle').node(), sc=shEl?getComputedStyle(shEl):null;
+  const extEl=gRoot.select('text.ext').node(), ec=extEl?getComputedStyle(extEl):null;
+  return `.link{fill:none;stroke:${lc?lc.stroke:'#888'};stroke-width:1.3}
+.link.crit{stroke:${cc?cc.stroke:cssv('--sg-primary')};stroke-width:2.2}
+.node path.sh,.node circle{stroke:${sc?sc.stroke:'#000'};stroke-width:1.5}
+.node.crit path.sh,.node.crit circle{stroke:${cssv('--sg-text')};stroke-width:2}
+.node.done path.sh{stroke:${cssv('--c-p3')};stroke-width:2}
+.node.next path.sh{stroke:${cssv('--sg-accent-2')};stroke-width:2.5}
+text.id{font-family:monospace;font-size:9px;font-weight:600;fill:${ic?ic.fill:'#fff'};text-anchor:middle;dominant-baseline:central}
+text.ext{font-size:11px;font-weight:600;fill:${ec?ec.fill:cssv('--sg-text-soft')};dominant-baseline:central}`;
+}
+function serializeSVG(){
+  const s=svg.node(), w=s.clientWidth, h=s.clientHeight, clone=s.cloneNode(true);
+  clone.setAttribute('xmlns','http://www.w3.org/2000/svg'); clone.setAttribute('width',w); clone.setAttribute('height',h);
+  const bg=document.createElementNS('http://www.w3.org/2000/svg','rect'); bg.setAttribute('width',w);bg.setAttribute('height',h);bg.setAttribute('fill',cssv('--sg-bg'));
+  clone.insertBefore(bg,clone.firstChild);
+  const st=document.createElementNS('http://www.w3.org/2000/svg','style'); st.textContent=svgStyleBlock(); clone.insertBefore(st,clone.firstChild);
+  return {data:'<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(clone), w, h};
+}
+function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
+document.getElementById('svgBtn').onclick=()=>{ const {data}=serializeSVG(); dl(new Blob([data],{type:'image/svg+xml'}),`speckit-graph-${state.spec}-${state.tab}.svg`); };
+document.getElementById('pngBtn').onclick=()=>{ const {data,w,h}=serializeSVG(); const img=new Image(); const sc=2;
+  img.onload=()=>{ const c=document.createElement('canvas'); c.width=w*sc; c.height=h*sc; const ctx=c.getContext('2d'); ctx.scale(sc,sc); ctx.drawImage(img,0,0); c.toBlob(b=>b&&dl(b,`speckit-graph-${state.spec}-${state.tab}.png`)); };
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(data); };
 document.getElementById('hproj').textContent=document.title.replace('Mapa do SpecKit','').trim()||'projeto';
 window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(fit,200);});
 window.addEventListener('hashchange',()=>{ const s=readHash(); syncUIToState(); render(true); if(s){const n=G._byId.get(s);if(n){showDetail(n);hover(n);setTimeout(()=>centerNode(s),650);}} });

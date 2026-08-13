@@ -78,6 +78,15 @@ speckit-graph check --gate error,warn     # também reprova em avisos
 
 Exit: `0` passou · `1` reprovou · `2` erro de execução.
 
+### Export & resumo
+
+```bash
+speckit-graph summary               # resumo Markdown no stdout (p/ PR/issue/ata)
+speckit-graph --summary resumo.md   # grava em arquivo
+```
+
+O resumo (determinístico) traz progresso, caminho crítico, gargalos, próximas tasks desbloqueáveis, achados do Doctor e o índice de confiança. No HTML, os botões **⬇ PNG** e **⬇ SVG** exportam a visão atual (respeitando aba, filtros, zoom e tema) — serialização nativa, sem libs.
+
 **Adoção gradual (baseline)** — para um plano legado que já tem problemas, aceite o estado atual e passe a reprovar só no que for **novo**:
 
 ```bash

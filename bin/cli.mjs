@@ -11,6 +11,7 @@ import { execFile } from 'node:child_process';
 import { parseSpecs } from '../src/parse.mjs';
 import { renderHTML } from '../src/template.mjs';
 import { buildGateReport, stringifyCanonical } from '../src/gate.mjs';
+import { buildSummary } from '../src/summary.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -204,6 +205,17 @@ function cmdCheck(flags) {
   process.exit(passed ? 0 : 1);
 }
 
+function cmdSummary(flags) {
+  const specsDir = findSpecsDir(flags.specs);
+  const src = flags.src ? path.resolve(flags.src) : null;
+  const project = flags.project || deriveProjectName(specsDir);
+  const md = buildSummary(parseSpecs(specsDir, { src }), project);
+  if (typeof flags.summary === 'string') {
+    const out = path.resolve(flags.summary);
+    fs.writeFileSync(out, md); console.error(`✓ resumo: ${out}`);
+  } else console.log(md);
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const sub = args._[0];
@@ -211,6 +223,7 @@ function main() {
     if (sub === 'init') return cmdInit(args.flags);
     if (sub === 'doctor' || args.flags.doctor) return cmdDoctor(args.flags);
     if (sub === 'check' || args.flags.check) return cmdCheck(args.flags);
+    if (sub === 'summary' || 'summary' in args.flags) return cmdSummary(args.flags);
     if (sub === 'help' || args.flags.help) {
       console.log(`speckit-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
 
