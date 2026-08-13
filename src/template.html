@@ -32,6 +32,7 @@
   header.top h1{font-size:17px;font-weight:800;margin:0;letter-spacing:-.3px}
   header.top h1 .dot{color:var(--sg-primary)}
   header.top .sub{font-size:12px;color:var(--sg-text-softer)}
+  .conf{font-size:11px;font-weight:700;padding:2px 9px;border-radius:9999px;vertical-align:middle;margin-left:4px}
   .seg{display:flex;background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:9999px;padding:3px;flex-wrap:wrap}
   .seg button{background:none;border:none;color:var(--sg-text-soft);font:inherit;font-size:12px;font-weight:600;padding:6px 13px;border-radius:9999px;cursor:pointer;transition:.2s;white-space:nowrap}
   .seg button.active{background:var(--sg-icon-bg);color:var(--sg-primary)}
@@ -86,7 +87,7 @@
 <div class="app">
   <header class="top">
     <div>
-      <h1>Mapa do SpecKit <span class="dot">·</span> <span id="hproj"></span></h1>
+      <h1>Mapa do SpecKit <span class="dot">·</span> <span id="hproj"></span> <span class="conf" id="confBadge"></span></h1>
       <div class="sub" id="tabsub">Dependências entre tasks</div>
     </div>
     <div class="tabs" id="tabs"></div>
@@ -345,6 +346,12 @@ function syncControls(){
 }
 function buildAside(){ const sp=DATA[state.spec];
   const st=document.getElementById('stats'), leg=document.getElementById('legend'), note=document.getElementById('legnote');
+  // badge de confiança (índice 0–100)
+  const cb=document.getElementById('confBadge'), conf=sp.confidence;
+  if(cb){ if(conf&&conf.index!=null){ const v=conf.index, col=cssv(v>=85?'--c-p3':v>=60?'--c-p2':'--c-p1');
+      cb.textContent='confiança '+v+'%'; cb.style.background=col+'22'; cb.style.color=col; cb.style.border='1px solid '+col+'55';
+      cb.title='Como confiar neste grafo — '+Object.entries(conf.dims||{}).map(([k,x])=>k+': '+x+'%').join(' · ');
+      cb.style.display=''; } else cb.style.display='none'; }
   if(state.tab==='deps'){
     const cnt={}; sp.tasks.forEach(n=>cnt[n.priority]=(cnt[n.priority]||0)+1);
     document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Prioridade (cor)';

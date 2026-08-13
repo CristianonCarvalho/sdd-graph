@@ -156,10 +156,11 @@ function cmdDoctor(flags) {
   const data = parseSpecs(specsDir, { src });
   let totalError = 0;
   for (const slug of Object.keys(data)) {
-    const { diagnostics } = data[slug];
+    const { diagnostics, confidence } = data[slug];
     const c = diagnostics.counts;
     totalError += c.error;
-    console.log(`\n🔎 ${slug} — ${c.error} erro(s), ${c.warn} aviso(s), ${c.info} info`);
+    const conf = confidence && confidence.index != null ? ` · confiança ${confidence.index}%` : '';
+    console.log(`\n🔎 ${slug} — ${c.error} erro(s), ${c.warn} aviso(s), ${c.info} info${conf}`);
     if (!diagnostics.findings.length) { console.log('   ✓ nenhum problema encontrado.'); continue; }
     for (const f of diagnostics.findings) {
       console.log(`   ${SEV_ICON[f.severity]} [${f.id}] ${f.message}`);

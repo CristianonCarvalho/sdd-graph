@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runDoctor } from './doctor.mjs';
+import { computeConfidence } from './confidence.mjs';
 
 /** Extrai todas as dependências (ids Txxx) declaradas via "depende de ..." num rótulo. */
 export function parseTaskDeps(label) {
@@ -182,7 +183,9 @@ function scanJavaSource(srcRoot) {
   // pacote-base = maior prefixo comum das declarações de package
   let base = parsed[0].seg.slice();
   for (const p of parsed) { let i = 0; while (i < base.length && base[i] === p.seg[i]) i++; base = base.slice(0, i); }
-  if (base.length && parsed.every(p => p.seg.length === base.length)) base = base.slice(0, -1);
+  // ambíguo: base vazia (raízes díspares) ou precisou aparar (todos no mesmo package)
+  let baseAmbiguous = base.length === 0;
+  if (base.length && parsed.every(p => p.seg.length === base.length)) { base = base.slice(0, -1); baseAmbiguous = true; }
   const bl = base.length;
   const inBase = segs => segs.length > bl && base.every((s, i) => segs[i] === s);
   const out = parsed.map(p => {
@@ -191,7 +194,7 @@ function scanJavaSource(srcRoot) {
       .map(segs => ({ group: canonGroup(segs[bl]), name: segs[bl + 1] }));
     return { group: canonGroup(rem[0]), sub: rem[1] || null, module: p.cls, imports };
   });
-  return { files: out, lang: 'Java' };
+  return { files: out, lang: 'Java', baseAmbiguous };
 }
 
 /** Arquitetura PRECISA: expande serviços e liga cada um ao adapter/modelo real (via imports). */
@@ -247,7 +250,7 @@ function buildArchFromSource(scan, meta) {
 
   const seen = new Set();
   const uniq = links.filter(([a, b]) => { const k = a + '|' + b; if (seen.has(k)) return false; seen.add(k); return true; });
-  return { nodes, links: uniq, meta, source: true };
+  return { nodes, links: uniq, meta, source: true, baseAmbiguous: !!scan.baseAmbiguous };
 }
 
 /** Arquitetura HEURÍSTICA (fallback): só specs, sem ler código. Serviços como um nó único. */
@@ -313,6 +316,21 @@ export function parseSpecs(specsDir, opts = {}) {
       arch: buildArch(tasks, dir, opts.src),
     };
     rec.diagnostics = runDoctor(rec);
+
+    // proveniência p/ o índice de confiança
+    const ids = new Set(tasks.map(t => t.id));
+    const checkboxLines = (fs.readFileSync(tasksFile, 'utf8').match(/^\s*-\s*\[[ xX~]\]/gm) || []).length;
+    let resolved = 0, unresolved = 0;
+    tasks.forEach(t => (t.depsRaw || []).forEach(d => {
+      if (ids.has(d) && d !== t.id) resolved++; else unresolved++;
+    }));
+    const provenance = {
+      taskLines: { exact: tasks.length, unmatched: Math.max(0, checkboxLines - tasks.length) },
+      depEdges: { resolved, unresolved },
+      arch: { source: !!rec.arch.source, baseAmbiguous: !!rec.arch.baseAmbiguous },
+    };
+    rec.confidence = { ...computeConfidence(provenance), provenance };
+
     out[entry.name] = rec;
   }
   if (Object.keys(out).length === 0) {

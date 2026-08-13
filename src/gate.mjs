@@ -51,6 +51,7 @@ export function buildGateReport(data, opts = {}) {
   const fingerprints = new Set();
   const stillPresent = new Set();
   let violations = 0;
+  let minConfidence = null;
 
   for (const slug of Object.keys(data).sort()) {
     const d = data[slug];
@@ -63,8 +64,11 @@ export function buildGateReport(data, opts = {}) {
       return { ...f, fingerprint: fp, ...(useBaseline ? { isNew } : {}) };
     });
     agg.error += diag.counts.error; agg.warn += diag.counts.warn; agg.info += diag.counts.info;
-    specs[slug] = { summary: diag.counts, graph: graphMetrics(d.tasks || [], diag), findings };
+    const conf = d.confidence ? d.confidence.index : null;
+    if (conf != null) minConfidence = minConfidence == null ? conf : Math.min(minConfidence, conf);
+    specs[slug] = { summary: diag.counts, confidenceIndex: conf, graph: graphMetrics(d.tasks || [], diag), findings };
   }
+  agg.confidenceIndex = minConfidence;
 
   const resolved = [...baseline].filter(fp => !stillPresent.has(fp)).sort();
   const passed = violations === 0;

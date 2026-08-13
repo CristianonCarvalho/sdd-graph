@@ -56,6 +56,16 @@ Regras (id · severidade):
 
 O diagnóstico também é embutido no HTML (`diagnostics`) para uso futuro na sobreposição visual.
 
+### Índice de confiança
+
+Cada spec recebe um **índice de confiança (0–100)** — uma leitura honesta de "quanto confiar neste grafo", determinística. Aparece como badge no HTML, no `doctor` e no JSON do `check` (`confidenceIndex`). Combina 3 dimensões (peso redistribuído quando uma não se aplica):
+
+- **task** — parsing das tasks (linhas casadas vs. malformadas)
+- **dep** — resolução das dependências (válidas vs. quebradas/auto-referência)
+- **arch** — derivação da arquitetura: lida do código (100%) · base ambígua (75%) · heurística (50%)
+
+Ex.: um monorepo sem `--src` cai a ~81% (arquitetura heurística); com `--src` na feature sobe a 100%.
+
 ## CI Gate — `check` (exit code + JSON)
 
 Embrulha o Doctor para o pipeline: relatório **JSON canônico** (determinístico) e **exit code** para reprovar o merge quando o plano tem problemas.
