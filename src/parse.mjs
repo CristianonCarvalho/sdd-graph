@@ -2,6 +2,7 @@
 // Genérico: descobre todos os specs/*/tasks.md do projeto onde roda.
 import fs from 'node:fs';
 import path from 'node:path';
+import { runDoctor } from './doctor.mjs';
 
 /** Extrai todas as dependências (ids Txxx) declaradas via "depende de ..." num rótulo. */
 export function parseTaskDeps(label) {
@@ -72,13 +73,14 @@ export function parseTasksFile(file) {
         done: tm[1].toLowerCase() === 'x',
         parallel,
         deps: parseTaskDeps(rest),
-        frs: [...new Set(rest.match(/FR-\d+/g) || [])],
+        frs: [...new Set(rest.match(/FR-\d+[a-z]?/g) || [])],
       });
     }
   }
-  // remove deps que apontam para ids inexistentes (cross-spec / prosa)
+  // guarda as deps cruas (para o Doctor detectar DEP_UNKNOWN/SELF_DEP) e
+  // depois filtra as deps usáveis (remove ids inexistentes / auto-referência).
   const ids = new Set(nodes.map(n => n.id));
-  nodes.forEach(n => { n.deps = n.deps.filter(d => ids.has(d) && d !== n.id); });
+  nodes.forEach(n => { n.depsRaw = [...n.deps]; n.deps = n.deps.filter(d => ids.has(d) && d !== n.id); });
   return nodes;
 }
 
@@ -303,13 +305,15 @@ export function parseSpecs(specsDir, opts = {}) {
     if (!fs.existsSync(tasksFile)) continue;
     const tasks = parseTasksFile(tasksFile);
     const spec = parseSpecMd(dir);
-    out[entry.name] = {
+    const rec = {
       tasks,
       usecases: spec.usecases,
       actors: spec.actors,
       frText: spec.frText,
       arch: buildArch(tasks, dir, opts.src),
     };
+    rec.diagnostics = runDoctor(rec);
+    out[entry.name] = rec;
   }
   if (Object.keys(out).length === 0) {
     throw new Error(`Nenhum tasks.md encontrado em ${specsDir}/*/tasks.md`);

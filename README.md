@@ -33,7 +33,28 @@ speckit-graph [opções]
   --project <nome>  nome exibido no cabeçalho
   --cdn             usa D3 via CDN (arquivo menor, precisa de internet)
   --open            abre o HTML no navegador ao terminar
+  --doctor          imprime o diagnóstico do plano (ver abaixo)
 ```
+
+## Doctor — diagnóstico determinístico do plano
+
+Um "linter" do plano SpecKit: roda sobre o que já é lido e aponta problemas de planejamento, de forma reproduzível (mesmo input → mesma saída), sem rede nem escrita.
+
+```bash
+speckit-graph doctor            # relatório humano
+speckit-graph doctor --strict   # sai com código ≠0 se houver erro (para CI)
+speckit-graph --doctor          # mesmo relatório junto do fluxo normal
+```
+
+Regras (id · severidade):
+
+| Severidade | Regras |
+|---|---|
+| **Erro** | `CYCLE` (ciclo de dependência, com a aresta que quebra) · `DEP_UNKNOWN` (depende de ID inexistente) · `SELF_DEP` (depende de si mesma) · `DUP_TASK_ID` (ID repetido) |
+| **Aviso** | `TASK_NO_PRIORITY` · `TASK_NO_STORY` · `FR_ORPHAN` (FR não citado por nenhuma task) · `STORY_NO_FR` (user story sem FR) |
+| **Info** | `CODE_ORPHAN` (módulo em `src/` sem task que o cite — heurístico) |
+
+O diagnóstico também é embutido no HTML (`diagnostics`) para uso futuro na sobreposição visual.
 
 ## Comando /speckit-graph (Claude Code, GitHub Copilot e Kiro)
 

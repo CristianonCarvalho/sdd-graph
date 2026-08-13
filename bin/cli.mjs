@@ -147,11 +147,34 @@ function cmdGenerate(flags) {
   if (flags.open) { openFile(out); console.log('  Abrindo no navegador…'); }
 }
 
+const SEV_ICON = { error: '❌', warn: '⚠️ ', info: 'ℹ️ ' };
+
+function cmdDoctor(flags) {
+  const specsDir = findSpecsDir(flags.specs);
+  const src = flags.src ? path.resolve(flags.src) : null;
+  const data = parseSpecs(specsDir, { src });
+  let totalError = 0;
+  for (const slug of Object.keys(data)) {
+    const { diagnostics } = data[slug];
+    const c = diagnostics.counts;
+    totalError += c.error;
+    console.log(`\n🔎 ${slug} — ${c.error} erro(s), ${c.warn} aviso(s), ${c.info} info`);
+    if (!diagnostics.findings.length) { console.log('   ✓ nenhum problema encontrado.'); continue; }
+    for (const f of diagnostics.findings) {
+      console.log(`   ${SEV_ICON[f.severity]} [${f.id}] ${f.message}`);
+    }
+  }
+  console.log('');
+  // --doctor apenas relata; o exit code faz parte do futuro CI Gate (--check).
+  if (flags.strict && totalError > 0) process.exit(1);
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const sub = args._[0];
   try {
     if (sub === 'init') return cmdInit(args.flags);
+    if (sub === 'doctor' || args.flags.doctor) return cmdDoctor(args.flags);
     if (sub === 'help' || args.flags.help) {
       console.log(`speckit-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
 
@@ -163,6 +186,10 @@ function main() {
     --project <nome> nome exibido no cabeçalho
     --cdn           usa D3 via CDN em vez de embutir (arquivo menor, precisa de internet)
     --open          abre o HTML no navegador ao terminar
+    --doctor        imprime o diagnóstico do plano (ciclos, FR órfã, tasks soltas…)
+
+  speckit-graph doctor [--specs <dir>] [--src <dir>] [--strict]
+    diagnóstico determinístico do plano; --strict sai com código ≠0 se houver erro
 
   speckit-graph init [--global] [--target <lista>]
     instala o comando /speckit-graph nas ferramentas de IA
