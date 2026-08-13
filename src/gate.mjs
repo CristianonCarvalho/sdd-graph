@@ -87,6 +87,39 @@ export function buildGateReport(data, opts = {}) {
   return { report, passed, fingerprints };
 }
 
+/** Link de um achado para a visão exata do HTML (usa o permalink #hash). */
+function findingLink(f, baseUrl) {
+  if (!baseUrl) return '';
+  let hash = '';
+  if (f.targetKind === 'task') hash = `#tab=deps&sel=${f.targetId}`;
+  else if (f.targetKind === 'fr') hash = `#tab=usecases&sel=fr_${f.targetId}`;
+  else if (f.targetKind === 'story') hash = `#tab=usecases&sel=${f.targetId}`;
+  else if (f.targetKind === 'module') hash = `#tab=arch&sel=${f.targetId}`;
+  return `[ver](${baseUrl}${hash})`;
+}
+
+/** Relatório em Markdown para postar como comentário de PR (idempotente via marcador). */
+export function gateMarkdown(report, opts = {}) {
+  const base = opts.baseUrl || '';
+  const s = report.summary;
+  const L = ['<!-- speckit-graph -->', '### 🔎 speckit-graph — gate do plano',
+    `**${report.gate.passed ? '✅ passou' : '❌ reprovou'}** — ${s.error} erro(s), ${s.warn} aviso(s), ${s.info} info · confiança ${s.confidenceIndex != null ? s.confidenceIndex + '%' : '—'}`, ''];
+  for (const slug of Object.keys(report.specs)) {
+    const sp = report.specs[slug];
+    L.push(`#### ${slug} — ${sp.summary.error} erro(s), ${sp.summary.warn} aviso(s)${sp.confidenceIndex != null ? ` · confiança ${sp.confidenceIndex}%` : ''}`);
+    const shown = sp.findings.filter(f => f.severity !== 'info').slice(0, 20);
+    if (shown.length) {
+      L.push('| Sev | Achado | |', '|:--:|---|--|');
+      shown.forEach(f => L.push(`| ${f.severity === 'error' ? '❌' : '⚠️'} | \`[${f.id}]\` ${String(f.message).replace(/\|/g, '\\|')} | ${findingLink(f, base)} |`));
+      const rest = sp.findings.filter(f => f.severity !== 'info').length - shown.length;
+      if (rest > 0) L.push(`| | _+ ${rest} outro(s)_ | |`);
+    } else L.push('_sem erros/avisos_ ✓');
+    L.push('', `Grafo: ${sp.graph.nodes} tasks · ${sp.graph.edges} deps · caminho crítico ${sp.graph.criticalPathLength ?? '—'}`, '');
+  }
+  L.push('<sub>gerado por speckit-graph — determinístico</sub>');
+  return L.join('\n');
+}
+
 /** Serialização canônica (chaves ordenadas) — mesma entrada => mesmos bytes. */
 export function stringifyCanonical(obj) {
   const canon = o => Array.isArray(o) ? o.map(canon)

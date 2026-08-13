@@ -97,6 +97,14 @@ speckit-graph check --baseline sg.baseline.json                     # reprova s�
 
 Cada achado tem um `fingerprint` estável (independe de ordem/posição). Workflow de exemplo do GitHub Actions em [`examples/github/speckit-graph.yml`](examples/github/speckit-graph.yml).
 
+**Comentário de PR** — `check --format md` emite Markdown (tabela de achados com links para a visão exata) para postar como comentário fixo no PR:
+
+```bash
+speckit-graph check --format md --base-url https://ci.exemplo/speckit-graph.html
+```
+
+O Markdown traz um marcador `<!-- speckit-graph -->` para o comentário ser atualizado (não duplicado) a cada push.
+
 ## Comando /speckit-graph (Claude Code, GitHub Copilot e Kiro)
 
 Instale o comando `/speckit-graph` nas três ferramentas de IA de uma vez:

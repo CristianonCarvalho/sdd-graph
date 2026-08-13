@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { parseSpecs } from '../src/parse.mjs';
 import { renderHTML } from '../src/template.mjs';
-import { buildGateReport, stringifyCanonical } from '../src/gate.mjs';
+import { buildGateReport, stringifyCanonical, gateMarkdown } from '../src/gate.mjs';
 import { buildSummary } from '../src/summary.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -196,9 +196,12 @@ function cmdCheck(flags) {
     process.exit(0);
   }
 
-  const json = stringifyCanonical(report);
-  if (flags.json) { fs.writeFileSync(path.resolve(flags.json), json); console.error(`✓ JSON: ${path.resolve(flags.json)}`); }
-  else console.log(json); // stdout limpo p/ pipe
+  const out = flags.format === 'md'
+    ? gateMarkdown(report, { baseUrl: flags['base-url'] })
+    : stringifyCanonical(report);
+  const dest = flags.json || flags.out;
+  if (dest) { fs.writeFileSync(path.resolve(dest), out); console.error(`✓ ${flags.format === 'md' ? 'Markdown' : 'JSON'}: ${path.resolve(dest)}`); }
+  else console.log(out); // stdout limpo p/ pipe
 
   const s = report.summary;
   console.error(`\n${passed ? '✓ gate PASSOU' : '✗ gate FALHOU'} — ${s.error} erro(s), ${s.warn} aviso(s), ${s.info} info · reprova em: ${gate.join(',')}${baseline.size ? ' · baseline aplicado' : ''}${report.gate.violations ? ` · ${report.gate.violations} violação(ões)` : ''}`);
@@ -242,6 +245,8 @@ function main() {
 
   speckit-graph check [opções]   gate de CI: JSON canônico + exit code
     --json <arquivo>   grava o relatório JSON (default: stdout)
+    --format md        emite Markdown p/ comentário de PR (em vez de JSON)
+    --base-url <url>   URL do HTML publicado (links "ver" no Markdown)
     --gate <níveis>    severidades que reprovam (default: error; ex.: error,warn)
     --baseline <path>  reprova só em achados NOVOS vs. baseline (adoção gradual)
     --update-baseline  (re)grava o baseline com os achados atuais e sai 0

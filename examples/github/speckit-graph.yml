@@ -15,6 +15,16 @@ jobs:
         with:
           node-version: '20'
 
+      # Posta/atualiza um comentário determinístico no PR com os achados do Doctor.
+      # (roda antes do gate para comentar mesmo quando o gate reprova)
+      - name: PR comment (Doctor)
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          npx --yes github:CristianonCarvalho/speckit-graph check --format md > comment.md || true
+          gh pr comment "${{ github.event.number }}" --body-file comment.md --edit-last --create-if-none
+
       # Reprova o merge se o plano tiver ciclos, deps quebradas, ids duplicados etc.
       # Troque SEU_USUARIO pelo dono do repositório do speckit-graph.
       - name: Doctor gate
