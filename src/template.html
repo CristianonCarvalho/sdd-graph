@@ -74,8 +74,8 @@
   .nextitem:hover{background:var(--sg-icon-bg)}
   .nextitem .tid{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--sg-accent-2)}
   .nextitem .sw{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-  .node.done circle{stroke:var(--c-p3);stroke-width:2px}
-  .node.next circle{stroke:var(--sg-accent-2);stroke-width:2.5px}
+  .node.done circle,.node.done path.sh{stroke:var(--c-p3);stroke-width:2px}
+  .node.next circle,.node.next path.sh{stroke:var(--sg-accent-2);stroke-width:2.5px}
   #detail .empty{font-size:12px;color:var(--sg-text-softer);line-height:1.6}
   #detail .tid{font-size:13px;font-weight:700}
   #detail .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px;margin-left:7px;vertical-align:middle}
@@ -87,13 +87,36 @@
   .frtag{display:inline-block;background:var(--sg-icon-bg);border:1px solid var(--sg-icon-border);color:var(--sg-primary);font-size:10px;font-weight:600;padding:1px 7px;border-radius:6px;margin:2px 4px 2px 0}
   .link{fill:none;stroke:rgba(255,255,255,.13);stroke-width:1.3px}
   .link.crit{stroke:var(--sg-primary);stroke-width:2.2px;opacity:.9}
-  .node circle{stroke:rgba(0,0,0,.45);stroke-width:1.5px;cursor:pointer;transition:opacity .25s}
-  .node.crit circle{stroke:#fff;stroke-width:2px}
+  .node circle,.node path.sh{stroke:rgba(0,0,0,.45);stroke-width:1.5px;cursor:pointer;transition:opacity .25s}
+  .node.crit circle,.node.crit path.sh{stroke:#fff;stroke-width:2px}
   .node text.id{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;fill:#fff;pointer-events:none;text-anchor:middle;dominant-baseline:central}
   .node text.ext{font-size:11px;font-weight:600;fill:var(--sg-text-soft);pointer-events:none;dominant-baseline:central}
   .dim{opacity:.08!important}
   .link.dim{opacity:.04!important}
   @media (max-width:820px){ aside{display:none} .search{width:110px} }
+
+  /* Paleta segura para daltonismo (Okabe-Ito) — matizes distinguíveis em deuteranopia/protanopia */
+  :root[data-palette="safe"]{
+    --c-p1:#D55E00; --c-p2:#E69F00; --c-p3:#009E73; --c-setup:#56B4E9; --c-found:#CC79A7; --c-polish:#0072B2;
+    --k-actor:#E69F00; --k-ui:#56B4E9; --k-api:#009E73; --k-service:#D55E00; --k-integration:#CC79A7;
+    --k-external:#8C97A3; --k-model:#0072B2; --k-datastore:#56B4E9; --k-config:#9AA0A6; --k-fr:#CC79A7;
+    --sg-primary:#D55E00; --sg-accent-2:#E69F00;
+  }
+  /* Tema claro / impressão */
+  :root[data-theme="light"]{
+    --sg-bg:#ffffff; --sg-text:#15181d; --sg-text-soft:rgba(20,24,29,.72); --sg-text-softer:rgba(20,24,29,.5);
+    --sg-card-bg:rgba(20,24,29,.03); --sg-card-border:rgba(20,24,29,.12);
+    --sg-pill-bg:rgba(20,24,29,.04); --sg-pill-border:rgba(20,24,29,.12);
+    --sg-glow-soft:rgba(255,144,77,.10); --sg-stage-glow:rgba(255,144,77,.05);
+  }
+  :root[data-theme="light"] .node text.id{fill:#fff}
+  :root[data-theme="light"] .link{stroke:rgba(20,24,29,.22)}
+  @media (prefers-reduced-motion: reduce){ *{animation:none!important} .pfill{transition:none} }
+  @media print{
+    :root{ --sg-bg:#fff; --sg-text:#000; }
+    body{background:#fff} .replay,.tabs,.ctrls,#linkBtn{display:none!important}
+    .link{stroke:#555!important} aside{border-color:#ccc}
+  }
 </style>
 </head>
 <body>
@@ -108,6 +131,8 @@
     <div class="ctrls">
       <input class="search" id="search" placeholder="buscar…">
       <span class="chip" id="linkBtn" title="copiar link desta visão">🔗 link</span>
+      <span class="chip" id="themeBtn" title="tema claro / escuro">◐ tema</span>
+      <span class="chip off" id="paletteBtn" title="paleta segura para daltonismo">🎨 paleta</span>
       <span class="chip" id="critToggle"><span class="sw" style="background:var(--sg-primary)"></span>caminho crítico</span>
       <span class="chip off" id="doneToggle"><span class="sw" style="background:var(--c-p3)"></span>ocultar concluídas</span>
       <span class="chip" id="priBar"></span>
@@ -286,7 +311,16 @@ function layout(G){
 }
 
 // ---------------- render (compartilhado) ----------------
+// duplo canal: forma do nó por prioridade (não depende só de cor)
+const SYM={P1:d3.symbolTriangle,P2:d3.symbolSquare,P3:d3.symbolCircle,FOUND:d3.symbolDiamond,SETUP:d3.symbolWye,POLISH:d3.symbolCross};
+function nodeShape(d){
+  const pri = d._t? d._t.priority : (d._d&&d._d.uc? d._d.uc.priority : null);
+  const type = (pri&&SYM[pri])? SYM[pri] : d3.symbolCircle;
+  return d3.symbol().type(type).size(d.r*d.r*3.2)();
+}
 const svg=d3.select('#svg'); let G, gRoot, zoom, pulseT;
+const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const SHAPE_CHAR={P1:'▲',P2:'■',P3:'●',FOUND:'◆',SETUP:'✚',POLISH:'✖'};
 function buildFor(tab){ const sp=DATA[state.spec];
   return tab==='usecases'?buildUsecases(sp): tab==='arch'?buildArch(sp): buildDeps(sp); }
 
@@ -305,13 +339,13 @@ function render(animate){
     .attr('d',d=>edge(d));
   const node=gRoot.append('g').selectAll('g').data(G.nodes,d=>d.id).join('g')
     .attr('class',d=>'node'+(d.crit?' crit':'')+(d.done?' done':'')+(d.unblocked?' next':'')).attr('transform',d=>`translate(${d.x},${d.y})`);
-  node.append('circle').attr('r',d=>d.r).attr('fill',d=>d.color);
+  node.append('path').attr('class','sh').attr('d',d=>nodeShape(d)).attr('fill',d=>d.color);
   node.filter(d=>d.idText).append('text').attr('class','id').text(d=>d.idText);
   if(extLabels) node.append('text').attr('class','ext').attr('x',d=>d.r+7).text(d=>trunc(d.name,22));
   node.on('mouseenter',(e,d)=>hover(d)).on('mouseleave',()=>hover(null)).on('click',(e,d)=>{showDetail(d);e.stopPropagation();});
   svg.on('click',()=>clearDetail());
   zoom=d3.zoom().scaleExtent([.2,3]).on('zoom',ev=>gRoot.attr('transform',ev.transform)); svg.call(zoom); fit();
-  if(animate!==false){
+  if(animate!==false && !reduceMotion){
     node.style('opacity',0).attr('transform',d=>`translate(${d.x},${d.y}) scale(.2)`);
     node.transition().delay(d=>d.layer*110+Math.random()*70).duration(520).ease(d3.easeBackOut.overshoot(1.3))
       .style('opacity',1).attr('transform',d=>`translate(${d.x},${d.y}) scale(1)`);
@@ -319,7 +353,7 @@ function render(animate){
       .transition().delay(d=>{const s=G._byId.get(d.source);return (s?s.layer:0)*110+200;}).duration(600)
       .attr('stroke-dashoffset',0).on('end',function(d){ if(!d.crit)d3.select(this).attr('stroke-dasharray',null); });
   }
-  if(G.nodes.some(n=>n.crit)) perpetual();
+  if(!reduceMotion && G.nodes.some(n=>n.crit)) perpetual();
   syncControls(); applyFilter(); buildAside();
 }
 function edge(d){ const s=G._byId.get(d.source),t=G._byId.get(d.target); if(!s||!t)return'';
@@ -398,7 +432,7 @@ function buildAside(){ const sp=DATA[state.spec];
     const cnt={}; sp.tasks.forEach(n=>cnt[n.priority]=(cnt[n.priority]||0)+1);
     document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Prioridade (cor)';
     st.innerHTML=stat(sp.tasks.length,'tasks')+stat(G.links.length,'dependências')+stat(cnt.P1||0,'P1 (MVP)','--c-p1')+stat(G.nodes.filter(n=>n.crit).length,'no caminho crítico','--sg-primary');
-    leg.innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>legrow(cssv(v.c),v.label,cnt[k])).join('')
+    leg.innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>legrow(cssv(v.c),(SHAPE_CHAR[k]||'●')+' '+v.label,cnt[k])).join('')
       +legrow(cssv('--c-p3'),'✓ concluída (anel verde)','')+legrow(cssv('--sg-accent-2'),'pronta p/ começar (anel âmbar)','');
     note.innerHTML='Tamanho do nó = quantas tasks dependem dele.<br>Anel branco = caminho crítico.';
     buildProgress(sp);
@@ -406,7 +440,7 @@ function buildAside(){ const sp=DATA[state.spec];
     const cnt={}; sp.usecases.forEach(u=>cnt[u.priority]=(cnt[u.priority]||0)+1);
     document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Prioridade (cor)';
     st.innerHTML=stat(sp.usecases.length,'casos de uso')+stat(Object.keys(sp.frText).length,'requisitos (FR)')+stat(cnt.P1||0,'P1','--c-p1')+stat(1,'ator');
-    leg.innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>legrow(cssv(v.c),v.label,cnt[k])).join('')
+    leg.innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>legrow(cssv(v.c),(SHAPE_CHAR[k]||'●')+' '+v.label,cnt[k])).join('')
       +legrow(cssv('--k-actor'),'Ator','')+legrow(cssv('--k-fr'),'Requisito (FR)','');
     note.innerHTML='Ator → casos de uso → requisitos que cada um cobre.';
   } else {
@@ -474,11 +508,24 @@ document.getElementById('replay').onclick=()=>render(true);
 document.getElementById('linkBtn').onclick=function(){ writeHash(); const u=location.href;
   const done=()=>{ const o=this.textContent; this.textContent='✓ copiado'; setTimeout(()=>this.textContent=o,1400); };
   if(navigator.clipboard) navigator.clipboard.writeText(u).then(done,done); else done(); };
+// acessibilidade: tema claro/escuro + paleta segura (persistidos; localStorage
+// blindado porque file:// pode restringir o acesso em alguns ambientes)
+const LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+function applyA11y(){ const r=document.documentElement;
+  const th=LS.get('sg-theme'); th?r.setAttribute('data-theme',th):r.removeAttribute('data-theme');
+  const pal=LS.get('sg-palette'); pal?r.setAttribute('data-palette',pal):r.removeAttribute('data-palette');
+  document.getElementById('paletteBtn').classList.toggle('off',pal!=='safe');
+}
+document.getElementById('themeBtn').onclick=()=>{ const cur=document.documentElement.getAttribute('data-theme');
+  cur==='light'?LS.del('sg-theme'):LS.set('sg-theme','light'); applyA11y(); render(true); };
+document.getElementById('paletteBtn').onclick=()=>{ const cur=document.documentElement.getAttribute('data-palette');
+  cur==='safe'?LS.del('sg-palette'):LS.set('sg-palette','safe'); applyA11y(); render(true); };
 document.getElementById('hproj').textContent=document.title.replace('Mapa do SpecKit','').trim()||'projeto';
 window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(fit,200);});
 window.addEventListener('hashchange',()=>{ const s=readHash(); syncUIToState(); render(true); if(s){const n=G._byId.get(s);if(n){showDetail(n);hover(n);setTimeout(()=>centerNode(s),650);}} });
 
-// init: hidrata do hash (permalink), sincroniza UI e renderiza
+// init: aplica acessibilidade, hidrata do hash (permalink), sincroniza UI e renderiza
+applyA11y();
 const _pending=readHash(); hashReady=true; syncUIToState();
 render(true);
 if(_pending){ const n=G._byId.get(_pending); if(n){ showDetail(n); hover(n); setTimeout(()=>centerNode(_pending),700); } }
