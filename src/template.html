@@ -63,6 +63,19 @@
   .legrow{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--sg-text-soft);padding:3px 0}
   .legrow .sw{width:12px;height:12px;border-radius:50%;flex:0 0 auto}
   .legnote{font-size:11px;color:var(--sg-text-softer);line-height:1.5;margin-top:8px}
+  .pbar{height:9px;border-radius:9999px;background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);overflow:hidden}
+  .pfill{height:100%;background:linear-gradient(90deg,var(--c-p3),var(--sg-primary));border-radius:9999px;transition:width .6s ease}
+  .pmeta{font-size:12px;color:var(--sg-text-soft);margin-top:7px;font-weight:600}
+  .pby{margin-top:9px;display:flex;flex-direction:column;gap:5px}
+  .pbyrow{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--sg-text-softer)}
+  .pbyrow .mini{flex:1;height:5px;border-radius:9999px;background:var(--sg-pill-bg);overflow:hidden}
+  .pbyrow .mini i{display:block;height:100%;border-radius:9999px}
+  .nextitem{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sg-text-soft);padding:6px 8px;border-radius:8px;cursor:pointer;transition:.15s}
+  .nextitem:hover{background:var(--sg-icon-bg)}
+  .nextitem .tid{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--sg-accent-2)}
+  .nextitem .sw{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .node.done circle{stroke:var(--c-p3);stroke-width:2px}
+  .node.next circle{stroke:var(--sg-accent-2);stroke-width:2.5px}
   #detail .empty{font-size:12px;color:var(--sg-text-softer);line-height:1.6}
   #detail .tid{font-size:13px;font-weight:700}
   #detail .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px;margin-left:7px;vertical-align:middle}
@@ -95,6 +108,7 @@
     <div class="ctrls">
       <input class="search" id="search" placeholder="buscar…">
       <span class="chip" id="critToggle"><span class="sw" style="background:var(--sg-primary)"></span>caminho crítico</span>
+      <span class="chip off" id="doneToggle"><span class="sw" style="background:var(--c-p3)"></span>ocultar concluídas</span>
       <span class="chip" id="priBar"></span>
     </div>
   </header>
@@ -106,6 +120,8 @@
     </div>
     <aside>
       <div class="card"><h3 id="statsTitle">Resumo</h3><div class="stats" id="stats"></div></div>
+      <div class="card hide" id="progressCard"><h3>Progresso</h3><div class="pbar"><div class="pfill" id="pfill"></div></div><div class="pmeta" id="pmeta"></div><div class="pby" id="pby"></div></div>
+      <div class="card hide" id="nextCard"><h3>Faça isto a seguir</h3><div id="nextList"></div></div>
       <div class="card"><h3 id="legTitle">Legenda</h3><div id="legend"></div><div class="legnote" id="legnote"></div></div>
       <div class="card" id="detail"><h3>Detalhe</h3><div class="empty">Clique num nó para ver os detalhes.</div></div>
     </aside>
@@ -133,7 +149,7 @@ const TABS = [
   {id:'usecases', label:'Casos de uso', sub:'Atores → casos de uso → requisitos'},
   {id:'arch', label:'Arquitetura', sub:'Componentes e fluxo (heurístico)'},
 ];
-const state = { spec:SPECS[0], tab:'deps', active:new Set(Object.keys(PRI)), crit:true, query:'' };
+const state = { spec:SPECS[0], tab:'deps', active:new Set(Object.keys(PRI)), crit:true, query:'', hideDone:false };
 
 // ---------------- construtores de grafo (um por aba) ----------------
 function normActor(a){ return /operador/i.test(a) ? 'Operador' : a.charAt(0).toUpperCase()+a.slice(1); }
@@ -162,9 +178,11 @@ function buildDeps(sp){
   const crit=new Set(); let c=st; while(c){crit.add(c);c=nx.get(c);}
   links.forEach(l=>{ if(crit.has(l.source)&&crit.has(l.target)&&nx.get(l.source)===l.target) l.crit=true; });
   const rS=d3.scaleSqrt().domain([0,d3.max(nodes,n=>n.blocks)||1]).range([9,24]);
+  const doneSet=new Set(nodes.filter(n=>n._t?.done ?? n.done).map(n=>n.id));
   const G={nodes:nodes.map(n=>({
     id:n.id, layer:n.layer, color:cssv(PRI[n.priority].c), r:rS(n.blocks),
-    idText:n.id.replace(/^T0*/,'T'), crit:crit.has(n.id), _t:n
+    idText:n.id.replace(/^T0*/,'T'), crit:crit.has(n.id), done:!!n.done,
+    unblocked:(!n.done && (n.deps||[]).every(d=>doneSet.has(d))), _t:n
   })), links, kind:'deps'};
   G.detail = nd => {
     const n=nd._t; const depd=raw.filter(x=>x.deps.includes(n.id)).map(x=>x.id);
@@ -285,7 +303,7 @@ function render(animate){
     .attr('class',d=>'link'+(d.crit?' crit':'')).attr('marker-end',d=>d.crit?'url(#arw-c)':'url(#arw-n)')
     .attr('d',d=>edge(d));
   const node=gRoot.append('g').selectAll('g').data(G.nodes,d=>d.id).join('g')
-    .attr('class',d=>'node'+(d.crit?' crit':'')).attr('transform',d=>`translate(${d.x},${d.y})`);
+    .attr('class',d=>'node'+(d.crit?' crit':'')+(d.done?' done':'')+(d.unblocked?' next':'')).attr('transform',d=>`translate(${d.x},${d.y})`);
   node.append('circle').attr('r',d=>d.r).attr('fill',d=>d.color);
   node.filter(d=>d.idText).append('text').attr('class','id').text(d=>d.idText);
   if(extLabels) node.append('text').attr('class','ext').attr('x',d=>d.r+7).text(d=>trunc(d.name,22));
@@ -311,6 +329,8 @@ function perpetual(){ gRoot.selectAll('.link.crit').attr('stroke-dasharray','8 6
 function fit(){ const b=gRoot.node().getBBox(),sw=svg.node().clientWidth,sh=svg.node().clientHeight;
   const k=Math.min(sw/(b.width+90),sh/(b.height+80),1.4), tx=(sw-b.width*k)/2-b.x*k, ty=(sh-b.height*k)/2-b.y*k;
   svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(k)); }
+function centerNode(id){ const n=G._byId.get(id); if(!n||!zoom)return; const sw=svg.node().clientWidth,sh=svg.node().clientHeight,k=1.1;
+  svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(sw/2-n.x*k,sh/2-n.y*k).scale(k)); }
 const trunc=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s;
 
 function hover(d){ const nodes=gRoot.selectAll('.node'),links=gRoot.selectAll('.link');
@@ -329,7 +349,7 @@ function applyFilter(){ const q=state.query.trim().toLowerCase(); const usePri=s
     let ok = usePri && d._t ? state.active.has(d._t.priority) : true;
     if(usePri && d.kind==='usecase' && d._d) ok=state.active.has(d._d.uc.priority);
     if(ok&&q){ const hay=((d.name||'')+' '+(d.idText||'')+' '+(d._t?d._t.label:'')).toLowerCase(); ok=hay.includes(q); }
-    let o=ok?1:.12; if(d.unlinked&&o===1&&!q) o=.4; return o; });
+    let o=ok?1:.12; if(d.unlinked&&o===1&&!q) o=.4; if(state.hideDone&&d.done&&!q) o=.06; return o; });
   gRoot.selectAll('.link.crit').style('display',state.crit?null:'none'); }
 
 // ---------------- UI ----------------
@@ -338,11 +358,31 @@ function syncControls(){
   if(state.tab==='arch') sub='Componentes e fluxo · '+(DATA[state.spec].arch.source?'lido do código-fonte':'heurístico (só specs)');
   document.getElementById('tabsub').textContent=sub;
   document.getElementById('critToggle').classList.toggle('hide',state.tab!=='deps');
+  document.getElementById('doneToggle').classList.toggle('hide',state.tab!=='deps');
   document.getElementById('priBar').classList.toggle('hide',state.tab==='arch');
+  document.getElementById('progressCard').classList.toggle('hide',state.tab!=='deps');
+  document.getElementById('nextCard').classList.toggle('hide',state.tab!=='deps');
   document.getElementById('hint').textContent = state.tab==='deps'
     ? 'arraste · zoom · passe o mouse num nó para ver o que ele bloqueia'
     : state.tab==='usecases' ? 'arraste · zoom · clique num caso de uso ou requisito'
     : 'arraste · zoom · clique num componente para ver o que ele agrupa';
+}
+function buildProgress(sp){
+  const total=sp.tasks.length, done=sp.tasks.filter(t=>t.done).length;
+  const pct=total?Math.round(done/total*100):0;
+  document.getElementById('pfill').style.width=pct+'%';
+  document.getElementById('pmeta').textContent=`${done} / ${total} concluídas (${pct}%)`;
+  const byp={}; sp.tasks.forEach(t=>{ (byp[t.priority]=byp[t.priority]||{d:0,t:0}); byp[t.priority].t++; if(t.done)byp[t.priority].d++; });
+  document.getElementById('pby').innerHTML=Object.keys(PRI).filter(k=>byp[k]).map(k=>{const o=byp[k],p=Math.round(o.d/o.t*100),c=cssv(PRI[k].c);
+    return `<div class="pbyrow"><span style="width:42px">${k}</span><span class="mini"><i style="width:${p}%;background:${c}"></i></span><span>${o.d}/${o.t}</span></div>`;}).join('');
+  // próximas desbloqueáveis: todo com todas as deps concluídas, ordenado por quão bloqueante
+  const nxt=G.nodes.filter(n=>n.unblocked).sort((a,b)=>(b._t.blocks-a._t.blocks)||(a.id<b.id?-1:1));
+  const list=document.getElementById('nextList');
+  list.innerHTML = nxt.length
+    ? nxt.slice(0,15).map(n=>`<div class="nextitem" data-id="${n.id}"><span class="sw" style="background:${n.color}"></span><span class="tid">${n.id}</span> ${trunc(n._t.label,28)}</div>`).join('')
+      + (nxt.length>15?`<div class="pmeta">+ ${nxt.length-15} outras</div>`:'')
+    : `<div style="font-size:12px;color:var(--sg-text-softer);line-height:1.5">${done===total&&total?'Tudo concluído 🎉':'Nenhuma task pronta para começar agora (todas dependem de algo em aberto).'}</div>`;
+  list.querySelectorAll('.nextitem').forEach(el=>el.onclick=()=>{const n=G._byId.get(el.dataset.id);if(n){showDetail(n);hover(n);centerNode(n.id);}});
 }
 function buildAside(){ const sp=DATA[state.spec];
   const st=document.getElementById('stats'), leg=document.getElementById('legend'), note=document.getElementById('legnote');
@@ -356,8 +396,10 @@ function buildAside(){ const sp=DATA[state.spec];
     const cnt={}; sp.tasks.forEach(n=>cnt[n.priority]=(cnt[n.priority]||0)+1);
     document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Prioridade (cor)';
     st.innerHTML=stat(sp.tasks.length,'tasks')+stat(G.links.length,'dependências')+stat(cnt.P1||0,'P1 (MVP)','--c-p1')+stat(G.nodes.filter(n=>n.crit).length,'no caminho crítico','--sg-primary');
-    leg.innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>legrow(cssv(v.c),v.label,cnt[k])).join('');
+    leg.innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>legrow(cssv(v.c),v.label,cnt[k])).join('')
+      +legrow(cssv('--c-p3'),'✓ concluída (anel verde)','')+legrow(cssv('--sg-accent-2'),'pronta p/ começar (anel âmbar)','');
     note.innerHTML='Tamanho do nó = quantas tasks dependem dele.<br>Anel branco = caminho crítico.';
+    buildProgress(sp);
   } else if(state.tab==='usecases'){
     const cnt={}; sp.usecases.forEach(u=>cnt[u.priority]=(cnt[u.priority]||0)+1);
     document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Prioridade (cor)';
@@ -392,6 +434,7 @@ const priBar=document.getElementById('priBar'); priBar.style.padding='4px 6px';
 priBar.innerHTML=Object.entries(PRI).map(([k,v])=>`<span class="pri-tog" data-k="${k}" title="${v.label}" style="display:inline-flex;align-items:center;gap:4px;margin:0 4px;cursor:pointer"><span class="sw" style="width:11px;height:11px;border-radius:50%;background:var(${v.c})"></span><span style="font-size:11px">${k}</span></span>`).join('');
 priBar.querySelectorAll('.pri-tog').forEach(t=>t.onclick=()=>{const k=t.dataset.k; if(state.active.has(k)){state.active.delete(k);t.style.opacity=.3;}else{state.active.add(k);t.style.opacity=1;} applyFilter();});
 document.getElementById('critToggle').onclick=function(){ state.crit=!state.crit; this.classList.toggle('off',!state.crit); applyFilter(); };
+document.getElementById('doneToggle').onclick=function(){ state.hideDone=!state.hideDone; this.classList.toggle('off',!state.hideDone); applyFilter(); };
 document.getElementById('search').oninput=e=>{state.query=e.target.value;applyFilter();};
 document.getElementById('replay').onclick=()=>render(true);
 document.getElementById('hproj').textContent=document.title.replace('Mapa do SpecKit','').trim()||'projeto';
