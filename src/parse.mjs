@@ -120,29 +120,76 @@ function planFields(specDir) {
   };
 }
 
-/** Varre src/ recursivamente por arquivos Python e seus imports internos (`from src.a.b …`). */
+/** Lista arquivos com uma extensão sob dir (recursivo), pulando caminhos de teste. */
+function walkFiles(dir, ext) {
+  const out = [];
+  (function w(d) {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { if (!/(^|\/)(test|tests)$/.test(p)) w(p); }
+      else if (e.name.endsWith(ext)) out.push(p);
+    }
+  })(dir);
+  return out;
+}
+
+/** Normaliza nomes de camada (varia por convenção/linguagem) para grupos canônicos. */
+function canonGroup(name) {
+  const n = String(name || '').toLowerCase();
+  if (/^(service|services)$/.test(n)) return 'services';
+  if (/^(integration|integrations|adapter|adapters|client|clients|gateway|gateways|external|externals)$/.test(n)) return 'integrations';
+  if (/^(model|models|entity|entities|domain|repository|repositories|dao|persistence)$/.test(n)) return 'models';
+  if (/^(db|database|migration|migrations)$/.test(n)) return 'db';
+  if (/^(api|controller|controllers|rest|resource|resources|route|routes|handler|handlers)$/.test(n)) return 'api';
+  if (/^(web|ui|view|views|template|templates|frontend)$/.test(n)) return 'web';
+  if (/^(config|configuration|settings)$/.test(n)) return 'config';
+  return n || null;
+}
+
+/** Python: imports internos `from src.a.b …`. */
 function scanPythonSource(srcDir) {
   if (!fs.existsSync(srcDir)) return null;
-  const rel = [];
-  (function walk(dir) {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith('.py') && e.name !== '__init__.py') rel.push(path.relative(srcDir, p));
-    }
-  })(srcDir);
-  if (!rel.length) return null;
-  const parseTarget = dotted => { const p = dotted.split('.').slice(1); return { group: p[0], name: p[1] }; };
-  const files = rel.map(f => {
-    const parts = f.replace(/\.py$/, '').split(path.sep);
-    const text = fs.readFileSync(path.join(srcDir, f), 'utf8');
+  const files = walkFiles(srcDir, '.py').filter(f => !f.endsWith('__init__.py'));
+  if (!files.length) return null;
+  const tgt = dotted => { const p = dotted.split('.').slice(1); return { group: canonGroup(p[0]), name: p[1] }; };
+  const out = files.map(abs => {
+    const parts = path.relative(srcDir, abs).replace(/\.py$/, '').split(path.sep);
+    const text = fs.readFileSync(abs, 'utf8');
     const imports = [];
     const re = /^\s*(?:from|import)\s+(src\.[\w.]+)/gm;
-    let m; while ((m = re.exec(text)) !== null) imports.push(parseTarget(m[1]));
-    // group = 1º nível (services, integrations…); sub = 2º nível (para integrations: binance, omqs); module = arquivo
-    return { group: parts[0], sub: parts.length > 2 ? parts[1] : null, module: parts[parts.length - 1], imports };
+    let m; while ((m = re.exec(text)) !== null) imports.push(tgt(m[1]));
+    return { group: canonGroup(parts[0]), sub: parts.length > 2 ? parts[1] : null, module: parts[parts.length - 1], imports };
   });
-  return { files };
+  return { files: out, lang: 'Python' };
+}
+
+/** Java: package/import sob um pacote-base detectado (ex.: com.exemplo.projeto). */
+function scanJavaSource(srcRoot) {
+  if (!fs.existsSync(srcRoot)) return null;
+  const files = walkFiles(srcRoot, '.java').filter(f => !/(package|module)-info\.java$/.test(f));
+  if (!files.length) return null;
+  const parsed = files.map(abs => {
+    const text = fs.readFileSync(abs, 'utf8');
+    const pkg = (text.match(/^\s*package\s+([\w.]+)\s*;/m) || [])[1] || '';
+    const imports = [];
+    const re = /^\s*import\s+(?:static\s+)?([\w.]+)\s*;/gm;
+    let m; while ((m = re.exec(text)) !== null) imports.push(m[1]);
+    return { seg: pkg ? pkg.split('.') : [], imports, cls: path.basename(abs, '.java') };
+  }).filter(p => p.seg.length);
+  if (!parsed.length) return null;
+  // pacote-base = maior prefixo comum das declarações de package
+  let base = parsed[0].seg.slice();
+  for (const p of parsed) { let i = 0; while (i < base.length && base[i] === p.seg[i]) i++; base = base.slice(0, i); }
+  if (base.length && parsed.every(p => p.seg.length === base.length)) base = base.slice(0, -1);
+  const bl = base.length;
+  const inBase = segs => segs.length > bl && base.every((s, i) => segs[i] === s);
+  const out = parsed.map(p => {
+    const rem = p.seg.slice(bl);
+    const imports = p.imports.map(s => s.split('.')).filter(inBase)
+      .map(segs => ({ group: canonGroup(segs[bl]), name: segs[bl + 1] }));
+    return { group: canonGroup(rem[0]), sub: rem[1] || null, module: p.cls, imports };
+  });
+  return { files: out, lang: 'Java' };
 }
 
 /** Arquitetura PRECISA: expande serviços e liga cada um ao adapter/modelo real (via imports). */
@@ -223,8 +270,12 @@ function buildArchHeuristic(tasks, meta) {
 export function buildArch(tasks, specDir) {
   const meta = planFields(specDir);
   const projectRoot = path.resolve(specDir, '..', '..'); // specs/<slug> -> raiz do projeto
-  const scan = scanPythonSource(path.join(projectRoot, 'src'));
-  if (scan && scan.files.some(f => f.group === 'services')) return buildArchFromSource(scan, meta);
+  const src = path.join(projectRoot, 'src');
+  const scan = scanPythonSource(src) || scanJavaSource(src);
+  if (scan && scan.files.some(f => f.group === 'services')) {
+    if (!meta.language && scan.lang) meta.language = scan.lang;
+    return buildArchFromSource(scan, meta);
+  }
   return buildArchHeuristic(tasks, meta);
 }
 
