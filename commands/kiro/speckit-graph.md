@@ -14,14 +14,14 @@ Passos:
 
 2. Execute o gerador **speckit-graph** no terminal, na raiz do projeto. Tente nesta ordem e use o primeiro que funcionar:
 
-   - Se a variável `SPECKIT_GRAPH_HOME` estiver definida:
-     `node "$SPECKIT_GRAPH_HOME/bin/cli.mjs" --open`
-   - Via repositório GitHub:
-     `npx --yes github:CristianonCarvalho/speckit-graph --open`
-   - Binário global (se instalado com `npm link`):
+   - Binário instalado localmente — PREFIRA este (gera direto, sem baixar nada):
      `speckit-graph --open`
+     (ou, se `SPECKIT_GRAPH_HOME` apontar para um clone: `node "$SPECKIT_GRAPH_HOME/bin/cli.mjs" --open`)
+   - Último recurso, só se não houver binário local (baixa do GitHub a cada execução):
+     `npx --yes github:CristianonCarvalho/speckit-graph --open`
 
-   Argumentos úteis: `--specs <dir>` para apontar os specs manualmente, `--out <arquivo>` para o caminho de saída, `--cdn` para não embutir o D3.
+   Para instalar o binário local uma vez: `npm install -g github:CristianonCarvalho/speckit-graph`.
+   Argumentos úteis: `--specs <dir>` para apontar os specs manualmente, `--out <arquivo>` para a saída, `--cdn` para não embutir o D3.
 
 3. Reporte ao usuário o caminho do HTML gerado, quantas specs/tasks/dependências foram lidas e confirme que abriu.
 

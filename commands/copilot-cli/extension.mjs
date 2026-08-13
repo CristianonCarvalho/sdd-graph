@@ -15,16 +15,38 @@ function findSpecsDir(cwd) {
   return null;
 }
 
-function runGenerator(cwd) {
+// Ordem de preferência (gera DIRETO, sem baixar):
+//   1) SPECKIT_GRAPH_HOME (clone local)  2) binário instalado (global/npm link)
+//   3) npx github (último recurso — baixa do GitHub a cada vez)
+function candidates() {
+  const home = process.env.SPECKIT_GRAPH_HOME;
+  const list = [];
+  if (home) list.push(["node", [path.join(home, "bin", "cli.mjs"), "--open"]]);
+  list.push(["speckit-graph", ["--open"]]);
+  list.push(["npx", ["--yes", "github:CristianonCarvalho/speckit-graph", "--open"]]);
+  return list;
+}
+
+function tryRun(cmd, args, cwd) {
   return new Promise((resolve) => {
-    const home = process.env.SPECKIT_GRAPH_HOME;
-    const [cmd, args] = home
-      ? ["node", [path.join(home, "bin", "cli.mjs"), "--open"]]
-      : ["npx", ["--yes", "github:CristianonCarvalho/speckit-graph", "--open"]];
     execFile(cmd, args, { cwd, timeout: 120000 }, (err, stdout, stderr) => {
-      resolve({ ok: !err, out: `${stdout || ""}${stderr || ""}`.trim() });
+      const out = `${stdout || ""}${stderr || ""}`.trim();
+      // ENOENT = binário não existe nesta máquina → tenta o próximo candidato
+      const missing = err && (err.code === "ENOENT");
+      resolve({ ok: !err, missing, out });
     });
   });
+}
+
+async function runGenerator(cwd) {
+  let last = { ok: false, out: "nenhum gerador disponível" };
+  for (const [cmd, args] of candidates()) {
+    const r = await tryRun(cmd, args, cwd);
+    if (r.ok) return r;        // gerou com sucesso
+    if (!r.missing) return r;  // existe mas falhou → reporta o erro real
+    last = r;                  // não existe → tenta o próximo
+  }
+  return last;
 }
 
 await joinSession({
