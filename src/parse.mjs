@@ -110,55 +110,122 @@ export function parseSpecMd(specDir) {
   return { usecases, actors: [...actors], frText };
 }
 
-/**
- * Deriva uma arquitetura (heurística) do plan.md + paths citados nas tasks.
- * Genérico: pastas src/<x> viram camadas; src/integrations/<y> vira adaptador
- * + sistema externo; Storage do plan.md vira datastore.
- */
-export function buildArch(tasks, specDir) {
+function planFields(specDir) {
   const planFile = path.join(specDir, 'plan.md');
   const plan = fs.existsSync(planFile) ? fs.readFileSync(planFile, 'utf8') : '';
   const field = re => { const m = plan.match(re); return m ? m[1].trim() : ''; };
-  const storage = field(/\*\*Storage\*\*:\s*([^\n(]+)/);
-  const language = field(/\*\*Language\/Version\*\*:\s*([^\n]+)/);
+  return {
+    storage: field(/\*\*Storage\*\*:\s*([^\n(]+)/),
+    language: field(/\*\*Language\/Version\*\*:\s*([^\n]+)/),
+  };
+}
 
-  const top = {}; // dir top -> Set(subdirs)
-  const pathRe = /src\/([a-zA-Z0-9_]+)(?:\/([a-zA-Z0-9_]+))?/g;
-  tasks.forEach(t => {
-    let m;
-    while ((m = pathRe.exec(t.label)) !== null) {
-      (top[m[1]] = top[m[1]] || new Set());
-      if (m[2] && m[2] !== 'main') top[m[1]].add(m[2]);
+/** Varre src/ recursivamente por arquivos Python e seus imports internos (`from src.a.b …`). */
+function scanPythonSource(srcDir) {
+  if (!fs.existsSync(srcDir)) return null;
+  const rel = [];
+  (function walk(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith('.py') && e.name !== '__init__.py') rel.push(path.relative(srcDir, p));
     }
+  })(srcDir);
+  if (!rel.length) return null;
+  const parseTarget = dotted => { const p = dotted.split('.').slice(1); return { group: p[0], name: p[1] }; };
+  const files = rel.map(f => {
+    const parts = f.replace(/\.py$/, '').split(path.sep);
+    const text = fs.readFileSync(path.join(srcDir, f), 'utf8');
+    const imports = [];
+    const re = /^\s*(?:from|import)\s+(src\.[\w.]+)/gm;
+    let m; while ((m = re.exec(text)) !== null) imports.push(parseTarget(m[1]));
+    // group = 1º nível (services, integrations…); sub = 2º nível (para integrations: binance, omqs); module = arquivo
+    return { group: parts[0], sub: parts.length > 2 ? parts[1] : null, module: parts[parts.length - 1], imports };
   });
-  const has = k => !!top[k];
-  const subs = k => (top[k] ? [...top[k]] : []);
+  return { files };
+}
 
+/** Arquitetura PRECISA: expande serviços e liga cada um ao adapter/modelo real (via imports). */
+function buildArchFromSource(scan, meta) {
+  const nodes = [], links = [], ids = new Set();
+  const add = (id, label, kind, layer, items) => { if (!ids.has(id)) { nodes.push({ id, label, kind, layer, items: items || [] }); ids.add(id); } return id; };
+  const link = (a, b) => { if (a && b && a !== b) links.push([a, b]); };
+  const groups = new Set(scan.files.map(f => f.group));
+  const svcFiles = scan.files.filter(f => f.group === 'services');
+  const apiFiles = scan.files.filter(f => f.group === 'api');
+
+  // adapters/externals: PACOTE de integração (src/integrations/<pkg>), não o arquivo
+  const intNames = new Set(scan.files.filter(f => f.group === 'integrations' && f.sub).map(f => f.sub));
+  scan.files.forEach(f => f.imports.forEach(i => { if (i.group === 'integrations' && i.name) intNames.add(i.name); }));
+
+  add('op', 'Operador', 'actor', 0);
+  let up = 'op';
+  if (groups.has('web')) { add('ui', 'Web UI', 'ui', 1); link(up, 'ui'); up = 'ui'; }
+  const hasApi = groups.has('api');
+  if (hasApi) { add('api', 'API', 'api', 2); link(up, 'api'); up = 'api'; }
+
+  svcFiles.forEach(s => add('svc_' + s.module, s.module, 'service', 3));
+  intNames.forEach(n => { add('int_' + n, n + ' adapter', 'integration', 4); link('int_' + n, add('ext_' + n, n.toUpperCase(), 'external', 5)); });
+  const hasData = groups.has('models') || groups.has('db');
+  if (hasData) {
+    const items = [...new Set(scan.files.filter(f => f.group === 'models' || f.group === 'db').map(f => f.module))];
+    add('data', 'Modelos + Persistência', 'model', 4, items);
+    if (meta.storage) link('data', add('store', meta.storage.replace(/[.;].*$/, '').trim(), 'datastore', 5));
+  }
+  if (groups.has('config')) { add('cfg', 'Config', 'config', 2); if (hasApi) link('cfg', 'api'); }
+
+  // arestas por import real
+  const incoming = new Set();
+  const emit = (from, to) => { link(from, to); incoming.add(to); };
+  svcFiles.forEach(s => {
+    const id = 'svc_' + s.module;
+    s.imports.forEach(i => {
+      if (i.group === 'integrations' && i.name) emit(id, 'int_' + i.name);
+      else if ((i.group === 'models' || i.group === 'db') && hasData) emit(id, 'data');
+      else if (i.group === 'services' && i.name && i.name !== s.module) emit(id, 'svc_' + i.name);
+    });
+  });
+  // API → serviços que a API importa
+  apiFiles.forEach(a => a.imports.forEach(i => { if (i.group === 'services' && i.name) { link('api', 'svc_' + i.name); incoming.add('svc_' + i.name); } }));
+  // qualquer serviço sem entrada liga no backbone (API ou nó acima)
+  svcFiles.forEach(s => { const id = 'svc_' + s.module; if (!incoming.has(id)) link(hasApi ? 'api' : up, id); });
+
+  const seen = new Set();
+  const uniq = links.filter(([a, b]) => { const k = a + '|' + b; if (seen.has(k)) return false; seen.add(k); return true; });
+  return { nodes, links: uniq, meta, source: true };
+}
+
+/** Arquitetura HEURÍSTICA (fallback): só specs, sem ler código. Serviços como um nó único. */
+function buildArchHeuristic(tasks, meta) {
+  const top = {};
+  const pathRe = /src\/([a-zA-Z0-9_]+)(?:\/([a-zA-Z0-9_]+))?/g;
+  tasks.forEach(t => { let m; while ((m = pathRe.exec(t.label)) !== null) { (top[m[1]] = top[m[1]] || new Set()); if (m[2] && m[2] !== 'main') top[m[1]].add(m[2]); } });
+  const has = k => !!top[k], subs = k => (top[k] ? [...top[k]] : []);
   const nodes = [], links = [];
   const add = (id, label, kind, layer, items) => { nodes.push({ id, label, kind, layer, items: items || [] }); return id; };
   const link = (a, b) => { if (a && b) links.push([a, b]); };
-
-  const actor = add('op', 'Operador', 'actor', 0);
-  let prev = actor;
+  const actor = add('op', 'Operador', 'actor', 0); let prev = actor;
   if (has('web')) { const n = add('ui', 'Web UI', 'ui', 1, subs('web')); link(prev, n); prev = n; }
   if (has('api')) { const n = add('api', 'API', 'api', 2, subs('api')); link(prev, n); prev = n; }
   let svc = null;
   if (has('services')) { svc = add('svc', 'Serviços', 'service', 3, subs('services')); link(prev, svc); prev = svc; }
   const hub = svc || prev;
-  if (has('config')) { const c = add('cfg', 'Config', 'config', 2, []); link(c, hub); }
-  if (has('integrations')) {
-    subs('integrations').forEach(name => {
-      const a = add('int_' + name, name + ' adapter', 'integration', 4, []);
-      link(hub, a);
-      link(a, add('ext_' + name, name.toUpperCase(), 'external', 5, []));
-    });
-  }
-  if (has('models') || has('db')) {
-    const persist = add('data', 'Modelos + Persistência', 'model', 4, [...subs('models'), ...subs('db')]);
-    link(hub, persist);
-    if (storage) link(persist, add('store', storage.replace(/[.;].*$/, '').trim(), 'datastore', 5, []));
-  }
-  return { nodes, links, meta: { language, storage } };
+  if (has('config')) link(add('cfg', 'Config', 'config', 2), hub);
+  if (has('integrations')) subs('integrations').forEach(name => { const a = add('int_' + name, name + ' adapter', 'integration', 4); link(hub, a); link(a, add('ext_' + name, name.toUpperCase(), 'external', 5)); });
+  if (has('models') || has('db')) { const p = add('data', 'Modelos + Persistência', 'model', 4, [...subs('models'), ...subs('db')]); link(hub, p); if (meta.storage) link(p, add('store', meta.storage.replace(/[.;].*$/, '').trim(), 'datastore', 5)); }
+  return { nodes, links, meta, source: false };
+}
+
+/**
+ * Deriva a arquitetura. Se houver código Python em <projeto>/src, lê os imports
+ * e liga cada serviço ao adapter/modelo real; senão, cai no heurístico (só specs).
+ */
+export function buildArch(tasks, specDir) {
+  const meta = planFields(specDir);
+  const projectRoot = path.resolve(specDir, '..', '..'); // specs/<slug> -> raiz do projeto
+  const scan = scanPythonSource(path.join(projectRoot, 'src'));
+  if (scan && scan.files.some(f => f.group === 'services')) return buildArchFromSource(scan, meta);
+  return buildArchHeuristic(tasks, meta);
 }
 
 /** Descobre e faz o parse de todos os specs/<slug>/ sob specsDir. */

@@ -192,8 +192,12 @@ function buildUsecases(sp){
     links.push({source:'actor',target:uc.id});
     frs.forEach(f=>{ usedFR.add(f); links.push({source:uc.id,target:'fr_'+f}); });
   });
-  [...usedFR].sort().forEach(f=>{
-    nodes.push({id:'fr_'+f, layer:2, color:cssv('--k-fr'), r:8, idText:f.replace('FR-',''), name:f, kind:'fr', _d:{type:'fr',fr:f}});
+  // todos os FRs do spec.md; os sem task vinculada aparecem esmaecidos (sem aresta)
+  const allFR=[...new Set([...usedFR, ...Object.keys(sp.frText)])].sort();
+  allFR.forEach(f=>{
+    const linked=usedFR.has(f);
+    nodes.push({id:'fr_'+f, layer:2, color:cssv('--k-fr'), r:linked?8:6, idText:f.replace('FR-',''), name:f, kind:'fr',
+      unlinked:!linked, _d:{type:'fr',fr:f,linked}});
   });
   const G={nodes,links,kind:'usecases'};
   G.detail = nd => {
@@ -206,7 +210,8 @@ function buildUsecases(sp){
       <div class="meta"><b>Requisitos cobertos:</b><br>${d.frs.length?d.frs.map(f=>`<span class="frtag">${f}</span>`).join(''):'—'}</div>`;
     if(d.type==='fr') return `<div class="tid mono">${d.fr}</div>
       <div class="lab">${sp.frText[d.fr]||'(texto não encontrado no spec.md)'}</div>
-      <div class="meta"><b>Casos de uso:</b> ${refsUC(sp,d.fr)}</div>`;
+      <div class="meta"><b>Casos de uso:</b> ${refsUC(sp,d.fr)}</div>
+      <div class="meta">${d.linked?'✓ Coberto por task(s).':'○ Sem task vinculada — consta apenas no spec.md.'}</div>`;
   };
   return G;
 }
@@ -323,12 +328,14 @@ function applyFilter(){ const q=state.query.trim().toLowerCase(); const usePri=s
     let ok = usePri && d._t ? state.active.has(d._t.priority) : true;
     if(usePri && d.kind==='usecase' && d._d) ok=state.active.has(d._d.uc.priority);
     if(ok&&q){ const hay=((d.name||'')+' '+(d.idText||'')+' '+(d._t?d._t.label:'')).toLowerCase(); ok=hay.includes(q); }
-    return ok?1:.12; });
+    let o=ok?1:.12; if(d.unlinked&&o===1&&!q) o=.4; return o; });
   gRoot.selectAll('.link.crit').style('display',state.crit?null:'none'); }
 
 // ---------------- UI ----------------
 function syncControls(){
-  document.getElementById('tabsub').textContent=TABS.find(t=>t.id===state.tab).sub;
+  let sub=TABS.find(t=>t.id===state.tab).sub;
+  if(state.tab==='arch') sub='Componentes e fluxo · '+(DATA[state.spec].arch.source?'lido do código-fonte':'heurístico (só specs)');
+  document.getElementById('tabsub').textContent=sub;
   document.getElementById('critToggle').classList.toggle('hide',state.tab!=='deps');
   document.getElementById('priBar').classList.toggle('hide',state.tab==='arch');
   document.getElementById('hint').textContent = state.tab==='deps'
@@ -356,7 +363,9 @@ function buildAside(){ const sp=DATA[state.spec];
     document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Tipo de componente (cor)';
     st.innerHTML=stat(sp.arch.nodes.length,'componentes')+stat(sp.arch.links.length,'conexões')+stat(sp.arch.nodes.filter(n=>n.kind==='external'||n.kind==='datastore').length,'externos')+stat((sp.arch.meta.language||'—').split(' ')[0],'linguagem');
     leg.innerHTML=Object.entries(KIND).filter(([k])=>kinds[k]).map(([k,v])=>legrow(cssv(v.c),v.label,kinds[k])).join('');
-    note.innerHTML='Fluxo da esquerda (usuário) para a direita (sistemas externos e dados). Derivado das pastas e do plan.md — heurístico.';
+    note.innerHTML=sp.arch.source
+      ? 'Fluxo da esquerda (usuário) para a direita. Cada serviço ligado ao adapter/modelo real, <b>lido dos imports do código</b> em <code>src/</code>.'
+      : 'Fluxo da esquerda (usuário) para a direita. Derivado das pastas e do plan.md — <b>heurístico</b> (código-fonte não encontrado).';
   }
 }
 const stat=(n,l,c)=>`<div class="stat"><div class="n"${c?` style="color:${cssv(c)}"`:''}>${n}</div><div class="l">${l}</div></div>`;

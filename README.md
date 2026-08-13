@@ -5,11 +5,11 @@ Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
 - **Dependências** — grafo dirigido em camadas das tasks: cor = prioridade (P1/P2/P3, Setup, Fundação, Polish), tamanho = quão bloqueante, **caminho crítico** animado.
 - **Casos de uso** — ator → casos de uso (user stories do `spec.md`, cor por prioridade) → requisitos (FR) que cada um cobre.
-- **Arquitetura** — componentes e fluxo (Web UI → API → Serviços → integrações/modelos → sistemas externos e banco), derivados do `plan.md` e das pastas `src/` (heurístico).
+- **Arquitetura** — componentes e fluxo (Web UI → API → Serviços → integrações/modelos → sistemas externos e banco). Se houver código Python em `src/`, **lê os `import`s** e liga cada serviço ao adapter/modelo real (preciso); senão, deriva das pastas + `plan.md` (heurístico). O subtítulo indica qual dos dois.
 
 Comum às três: hover ilumina a cadeia, clique abre o detalhe, filtro por prioridade, busca e toggle entre specs.
 
-Fontes lidas: `tasks.md` (dependências), `spec.md` (casos de uso e texto dos FRs), `plan.md` (stack/arquitetura). Nunca escreve nos specs; só lê.
+Fontes lidas (somente leitura, nunca escreve): `tasks.md` (dependências), `spec.md` (casos de uso e texto dos FRs), `plan.md` (stack), e — quando existir — `src/**/*.py` (acoplamento real na aba Arquitetura).
 
 Zero dependências de runtime (Node ≥ 18). D3 embutido no HTML.
 
