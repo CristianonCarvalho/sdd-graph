@@ -1,14 +1,15 @@
 # speckit-graph
 
-Grafo interativo de **dependências e prioridades** das tasks/RF geradas pelo [SpecKit](https://github.com/github/spec-kit).
-Lê os `specs/*/tasks.md` de um projeto e gera um HTML self-contained com:
+Diagramas interativos dos artefatos do [SpecKit](https://github.com/github/spec-kit).
+Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
-- **Grafo dirigido em camadas** — as dependências fluem da fundação para as features.
-- **Cor = prioridade** (P1/P2/P3, Setup, Fundação, Polish).
-- **Tamanho do nó = quão bloqueante** (nº de tasks que dependem dele).
-- **Caminho crítico** destacado e animado.
-- Hover ilumina a cadeia de dependências; clique mostra descrição, FRs e pré-requisitos.
-- Toggle entre múltiplos specs, filtro por prioridade e busca.
+- **Dependências** — grafo dirigido em camadas das tasks: cor = prioridade (P1/P2/P3, Setup, Fundação, Polish), tamanho = quão bloqueante, **caminho crítico** animado.
+- **Casos de uso** — ator → casos de uso (user stories do `spec.md`, cor por prioridade) → requisitos (FR) que cada um cobre.
+- **Arquitetura** — componentes e fluxo (Web UI → API → Serviços → integrações/modelos → sistemas externos e banco), derivados do `plan.md` e das pastas `src/` (heurístico).
+
+Comum às três: hover ilumina a cadeia, clique abre o detalhe, filtro por prioridade, busca e toggle entre specs.
+
+Fontes lidas: `tasks.md` (dependências), `spec.md` (casos de uso e texto dos FRs), `plan.md` (stack/arquitetura). Nunca escreve nos specs; só lê.
 
 Zero dependências de runtime (Node ≥ 18). D3 embutido no HTML.
 

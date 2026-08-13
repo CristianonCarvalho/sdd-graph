@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mapa de Tasks — SpecKit</title>
+<title>Mapa do SpecKit <!--__PROJECT__--></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <!--__D3__-->
@@ -18,25 +18,32 @@
     --sg-stage-glow:rgba(255,144,77,.06); --sg-accent-2:#FFC766;
     --c-p1:#FF904D; --c-p2:#FFC766; --c-p3:#35D07F;
     --c-setup:#6C7A89; --c-found:#8E7CC3; --c-polish:#5B8DEF;
+    /* arquitetura: cor por tipo de componente */
+    --k-actor:#FFC766; --k-ui:#5B8DEF; --k-api:#35D07F; --k-service:#FF904D;
+    --k-integration:#8E7CC3; --k-external:#8C97A3; --k-model:#E86A92;
+    --k-datastore:#5AC8FA; --k-config:#9AA0A6; --k-fr:#B7A0E0;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{background:var(--sg-bg);color:var(--sg-text);font-family:'Inter',sans-serif;overflow:hidden}
   .mono{font-family:'JetBrains Mono',monospace}
   .app{display:flex;flex-direction:column;height:100vh}
-  header.top{padding:14px 22px;border-bottom:1px solid var(--sg-card-border);display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(255,144,77,.04),transparent)}
-  header.top h1{font-size:18px;font-weight:800;margin:0;letter-spacing:-.3px}
+  header.top{padding:12px 22px;border-bottom:1px solid var(--sg-card-border);display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(255,144,77,.04),transparent)}
+  header.top h1{font-size:17px;font-weight:800;margin:0;letter-spacing:-.3px}
   header.top h1 .dot{color:var(--sg-primary)}
   header.top .sub{font-size:12px;color:var(--sg-text-softer)}
   .seg{display:flex;background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:9999px;padding:3px;flex-wrap:wrap}
-  .seg button{background:none;border:none;color:var(--sg-text-soft);font:inherit;font-size:12px;font-weight:600;padding:6px 14px;border-radius:9999px;cursor:pointer;transition:.2s;white-space:nowrap}
+  .seg button{background:none;border:none;color:var(--sg-text-soft);font:inherit;font-size:12px;font-weight:600;padding:6px 13px;border-radius:9999px;cursor:pointer;transition:.2s;white-space:nowrap}
   .seg button.active{background:var(--sg-icon-bg);color:var(--sg-primary)}
+  .tabs{display:flex;gap:4px;background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:12px;padding:4px}
+  .tabs button{background:none;border:none;color:var(--sg-text-soft);font:inherit;font-size:13px;font-weight:700;padding:7px 16px;border-radius:9px;cursor:pointer;transition:.2s}
+  .tabs button.active{background:var(--sg-primary);color:#1a1204}
   .ctrls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
   .chip{display:inline-flex;align-items:center;gap:7px;background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:9999px;padding:6px 12px;font-size:12px;color:var(--sg-text-soft);cursor:pointer;user-select:none;transition:.2s}
-  .chip:hover{border-color:var(--sg-icon-border)}
   .chip.off{opacity:.32}
   .chip .sw{width:11px;height:11px;border-radius:50%}
-  .search{background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:9999px;padding:6px 14px;color:var(--sg-text);font:inherit;font-size:12px;width:160px;outline:none}
+  .hide{display:none!important}
+  .search{background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:9999px;padding:6px 14px;color:var(--sg-text);font:inherit;font-size:12px;width:150px;outline:none}
   .search:focus{border-color:var(--sg-icon-border)}
   main{flex:1;display:flex;min-height:0}
   .stage{flex:1;position:relative;background:radial-gradient(circle at 50% 45%,var(--sg-stage-glow),transparent 72%);overflow:hidden}
@@ -69,6 +76,7 @@
   .node circle{stroke:rgba(0,0,0,.45);stroke-width:1.5px;cursor:pointer;transition:opacity .25s}
   .node.crit circle{stroke:#fff;stroke-width:2px}
   .node text.id{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;fill:#fff;pointer-events:none;text-anchor:middle;dominant-baseline:central}
+  .node text.ext{font-size:11px;font-weight:600;fill:var(--sg-text-soft);pointer-events:none;dominant-baseline:central}
   .dim{opacity:.08!important}
   .link.dim{opacity:.04!important}
   @media (max-width:820px){ aside{display:none} .search{width:110px} }
@@ -78,12 +86,13 @@
 <div class="app">
   <header class="top">
     <div>
-      <h1>Mapa de Tasks <span class="dot">·</span> SpecKit</h1>
-      <div class="sub">Dependências & prioridades · projeto <!--__PROJECT__--></div>
+      <h1>Mapa do SpecKit <span class="dot">·</span> <span id="hproj"></span></h1>
+      <div class="sub" id="tabsub">Dependências entre tasks</div>
     </div>
+    <div class="tabs" id="tabs"></div>
     <div class="seg" id="specSeg"></div>
     <div class="ctrls">
-      <input class="search" id="search" placeholder="buscar T0.. / texto">
+      <input class="search" id="search" placeholder="buscar…">
       <span class="chip" id="critToggle"><span class="sw" style="background:var(--sg-primary)"></span>caminho crítico</span>
       <span class="chip" id="priBar"></span>
     </div>
@@ -92,14 +101,12 @@
     <div class="stage">
       <button class="replay" id="replay">↻ reanimar</button>
       <svg id="svg"></svg>
-      <div class="hint">arraste para mover · scroll para zoom · passe o mouse num nó para ver o que ele bloqueia</div>
+      <div class="hint" id="hint"></div>
     </div>
     <aside>
-      <div class="card"><h3>Resumo</h3><div class="stats" id="stats"></div></div>
-      <div class="card"><h3>Prioridade (cor)</h3><div id="legend"></div>
-        <div class="legnote">Tamanho do nó = quantas tasks dependem dele (quanto maior, mais bloqueante).<br>Anel branco = está no caminho crítico.</div>
-      </div>
-      <div class="card" id="detail"><h3>Detalhe da task</h3><div class="empty">Clique num nó para ver descrição, requisitos (FR) e dependências.</div></div>
+      <div class="card"><h3 id="statsTitle">Resumo</h3><div class="stats" id="stats"></div></div>
+      <div class="card"><h3 id="legTitle">Legenda</h3><div id="legend"></div><div class="legnote" id="legnote"></div></div>
+      <div class="card" id="detail"><h3>Detalhe</h3><div class="empty">Clique num nó para ver os detalhes.</div></div>
     </aside>
   </main>
 </div>
@@ -108,170 +115,270 @@
 const DATA = window.SPECKIT_DATA;
 const SPECS = Object.keys(DATA);
 const PRI = {
-  P1:{c:'var(--c-p1)',label:'P1 · MVP/crítico'},
-  P2:{c:'var(--c-p2)',label:'P2 · importante'},
-  P3:{c:'var(--c-p3)',label:'P3 · desejável'},
-  FOUND:{c:'var(--c-found)',label:'Fundação (bloqueia tudo)'},
-  SETUP:{c:'var(--c-setup)',label:'Setup'},
-  POLISH:{c:'var(--c-polish)',label:'Polish / cross-cutting'}
+  P1:{c:'--c-p1',label:'P1 · MVP/crítico'}, P2:{c:'--c-p2',label:'P2 · importante'},
+  P3:{c:'--c-p3',label:'P3 · desejável'}, FOUND:{c:'--c-found',label:'Fundação (bloqueia tudo)'},
+  SETUP:{c:'--c-setup',label:'Setup'}, POLISH:{c:'--c-polish',label:'Polish / cross-cutting'}
 };
-const state = { spec:SPECS[0], active:new Set(Object.keys(PRI)), crit:true, query:'' };
+const KIND = {
+  actor:{c:'--k-actor',label:'Ator'}, ui:{c:'--k-ui',label:'Apresentação (UI)'},
+  api:{c:'--k-api',label:'API'}, service:{c:'--k-service',label:'Serviços / domínio'},
+  integration:{c:'--k-integration',label:'Integração (adapter)'}, external:{c:'--k-external',label:'Sistema externo'},
+  model:{c:'--k-model',label:'Modelos / persistência'}, datastore:{c:'--k-datastore',label:'Banco de dados'},
+  config:{c:'--k-config',label:'Configuração'}, fr:{c:'--k-fr',label:'Requisito (FR)'}, usecase:{c:'--k-actor',label:'Caso de uso'}
+};
+const cssv = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const TABS = [
+  {id:'deps', label:'Dependências', sub:'Dependências entre tasks'},
+  {id:'usecases', label:'Casos de uso', sub:'Atores → casos de uso → requisitos'},
+  {id:'arch', label:'Arquitetura', sub:'Componentes e fluxo (heurístico)'},
+];
+const state = { spec:SPECS[0], tab:'deps', active:new Set(Object.keys(PRI)), crit:true, query:'' };
 
-function buildGraph(specKey){
-  const raw = DATA[specKey];
+// ---------------- construtores de grafo (um por aba) ----------------
+function normActor(a){ return /operador/i.test(a) ? 'Operador' : a.charAt(0).toUpperCase()+a.slice(1); }
+
+function buildDeps(sp){
+  const raw = sp.tasks;
   const byId = new Map(raw.map(n=>[n.id,{...n}]));
-  const nodes = [...byId.values()];
-  const links = [];
-  nodes.forEach(n => n.deps.forEach(d => { if(byId.has(d)) links.push({source:d,target:n.id}); }));
-  const outM=new Map(), inM=new Map();
-  nodes.forEach(n=>{outM.set(n.id,[]);inM.set(n.id,[]);});
+  const nodes=[...byId.values()], links=[];
+  nodes.forEach(n=>n.deps.forEach(d=>{ if(byId.has(d)) links.push({source:d,target:n.id}); }));
+  const inM=new Map(),outM=new Map(); nodes.forEach(n=>{inM.set(n.id,[]);outM.set(n.id,[]);});
   links.forEach(l=>{outM.get(l.source).push(l.target);inM.get(l.target).push(l.source);});
   const layer=new Map();
-  function L(id,seen){ if(layer.has(id))return layer.get(id); if(seen.has(id))return 0; seen.add(id);
-    const ps=inM.get(id); let v = ps.length? Math.max(...ps.map(p=>L(p,seen)))+1 : 0; layer.set(id,v); return v; }
-  nodes.forEach(n=>L(n.id,new Set()));
-  nodes.forEach(n=>n.layer=layer.get(n.id));
-  function desc(id,memo,seen){ if(memo.has(id))return memo.get(id); if(seen.has(id))return new Set(); seen.add(id);
-    const s=new Set(); outM.get(id).forEach(c=>{s.add(c); desc(c,memo,seen).forEach(x=>s.add(x));}); memo.set(id,s); return s; }
-  const dmemo=new Map(); nodes.forEach(n=>n.blocks=desc(n.id,dmemo,new Set()).size);
-  const amemo=new Map();
-  function anc(id,seen){ if(amemo.has(id))return amemo.get(id); if(seen.has(id))return new Set(); seen.add(id);
-    const s=new Set(); inM.get(id).forEach(p=>{s.add(p); anc(p,seen).forEach(x=>s.add(x));}); amemo.set(id,s); return s;}
-  nodes.forEach(n=>{ n.ancSet=anc(n.id,new Set()); n.descSet=dmemo.get(n.id)||new Set(); });
-  const bestNext=new Map(), pathLen=new Map();
-  function PL(id){ if(pathLen.has(id))return pathLen.get(id); let best=0,nx=null;
-    outM.get(id).forEach(c=>{const v=PL(c); if(v>best){best=v;nx=c;}}); pathLen.set(id,best+1); bestNext.set(id,nx); return best+1; }
+  const L=(id,s)=>{ if(layer.has(id))return layer.get(id); if(s.has(id))return 0; s.add(id);
+    const ps=inM.get(id); const v=ps.length?Math.max(...ps.map(p=>L(p,s)))+1:0; layer.set(id,v); return v; };
+  nodes.forEach(n=>n.layer=L(n.id,new Set()));
+  const dmemo=new Map();
+  const desc=(id,s)=>{ if(dmemo.has(id))return dmemo.get(id); if(s.has(id))return new Set(); s.add(id);
+    const r=new Set(); outM.get(id).forEach(c=>{r.add(c); desc(c,s).forEach(x=>r.add(x));}); dmemo.set(id,r); return r; };
+  nodes.forEach(n=>n.blocks=desc(n.id,new Set()).size);
+  // caminho crítico
+  const pl=new Map(),nx=new Map();
+  const PL=id=>{ if(pl.has(id))return pl.get(id); let b=0,n=null; outM.get(id).forEach(c=>{const v=PL(c); if(v>b){b=v;n=c;}}); pl.set(id,b+1);nx.set(id,n);return b+1; };
   nodes.forEach(n=>PL(n.id));
-  let start=null,bl=0; nodes.forEach(n=>{ if(inM.get(n.id).length===0 && pathLen.get(n.id)>bl){bl=pathLen.get(n.id);start=n.id;} });
-  if(!start){ nodes.forEach(n=>{ if(pathLen.get(n.id)>bl){bl=pathLen.get(n.id);start=n.id;} }); }
-  const crit=new Set(); let cur=start; while(cur){crit.add(cur);cur=bestNext.get(cur);}
-  nodes.forEach(n=>n.crit=crit.has(n.id));
-  links.forEach(l=>{ if(crit.has(l.source)&&crit.has(l.target)&&bestNext.get(l.source)===l.target) l.crit=true; });
-  const layers={}; nodes.forEach(n=>(layers[n.layer]=layers[n.layer]||[]).push(n));
-  const maxL=Math.max(...nodes.map(n=>n.layer));
-  const COL=210, ROW=52, PADX=90, PADY=60;
-  Object.values(layers).forEach(col=>col.sort((a,b)=>(a.phaseIdx-b.phaseIdx)|| (a.id<b.id?-1:1)));
-  const pos=new Map();
-  function place(){ Object.keys(layers).sort((a,b)=>a-b).forEach(k=>{ const col=layers[k];
-    col.forEach((n,i)=>{ n.x=PADX+ (+k)*COL; n.y=PADY+i*ROW; pos.set(n.id,n.y); }); }); }
-  place();
-  for(let pass=0;pass<4;pass++){ Object.keys(layers).sort((a,b)=>a-b).forEach(k=>{ const col=layers[k];
-    col.forEach(n=>{ const ps=inM.get(n.id).map(id=>pos.get(id)).filter(v=>v!=null);
-      n.bary = ps.length? ps.reduce((a,b)=>a+b,0)/ps.length : n.y; });
-    col.sort((a,b)=>a.bary-b.bary || a.phaseIdx-b.phaseIdx);
-    col.forEach((n,i)=>{ n.y=PADY+i*ROW; pos.set(n.id,n.y); }); }); }
-  const maxRows=Math.max(...Object.values(layers).map(c=>c.length));
-  const W=PADX*2+maxL*COL, H=PADY*2+(maxRows-1)*ROW;
-  return {nodes,links,W,H,maxL,COL,PADX,critCount:crit.size};
+  let st=null,bl=0; nodes.forEach(n=>{ if(!inM.get(n.id).length&&pl.get(n.id)>bl){bl=pl.get(n.id);st=n.id;} });
+  if(!st) nodes.forEach(n=>{ if(pl.get(n.id)>bl){bl=pl.get(n.id);st=n.id;} });
+  const crit=new Set(); let c=st; while(c){crit.add(c);c=nx.get(c);}
+  links.forEach(l=>{ if(crit.has(l.source)&&crit.has(l.target)&&nx.get(l.source)===l.target) l.crit=true; });
+  const rS=d3.scaleSqrt().domain([0,d3.max(nodes,n=>n.blocks)||1]).range([9,24]);
+  const G={nodes:nodes.map(n=>({
+    id:n.id, layer:n.layer, color:cssv(PRI[n.priority].c), r:rS(n.blocks),
+    idText:n.id.replace(/^T0*/,'T'), crit:crit.has(n.id), _t:n
+  })), links, kind:'deps'};
+  G.detail = nd => {
+    const n=nd._t; const depd=raw.filter(x=>x.deps.includes(n.id)).map(x=>x.id);
+    return `<div><span class="tid mono">${n.id}</span>
+      <span class="badge" style="${badge(cssv(PRI[n.priority].c))}">${n.priority}${n.parallel?' · ∥':''}${n.done?' · ✓':''}</span></div>
+      <div class="lab">${mdcode(n.label)}</div>
+      <div class="meta"><b>Fase:</b> ${n.phase}${n.story?` · <b>${n.story}</b>`:''}</div>
+      <div class="meta"><b>Bloqueia:</b> ${n.blocks} task(s)</div>
+      ${n.frs.length?`<div class="meta"><b>Requisitos:</b><br>${n.frs.map(f=>`<span class="frtag">${f}</span>`).join('')}</div>`:''}
+      <div class="meta"><b>Depende de:</b> ${refs(n.deps)}</div>
+      <div class="meta"><b>Pré-requisito de:</b> ${refs(depd)}</div>`;
+  };
+  return G;
 }
 
-const svg=d3.select('#svg');
-let G, rScale, gRoot, zoom;
-function pcolor(p){ const v=(PRI[p]||PRI.SETUP).c; const m=v.match(/--[\w-]+/); return getComputedStyle(document.documentElement).getPropertyValue(m[0]).trim(); }
+function buildUsecases(sp){
+  // agrega FRs por user story a partir das tasks
+  const frByUC={}; sp.tasks.forEach(t=>{ if(t.story){ (frByUC[t.story]=frByUC[t.story]||new Set()); t.frs.forEach(f=>frByUC[t.story].add(f)); } });
+  const nodes=[],links=[];
+  const actor='Operador';
+  nodes.push({id:'actor', layer:0, color:cssv('--k-actor'), r:20, idText:'', name:actor, kind:'actor', _d:{type:'actor'}});
+  const usedFR=new Set();
+  sp.usecases.forEach(uc=>{
+    const frs=[...(frByUC[uc.id]||[])].sort();
+    nodes.push({id:uc.id, layer:1, color:cssv(PRI[uc.priority].c), r:13, idText:uc.id, name:uc.title, kind:'usecase', _d:{type:'uc',uc,frs}});
+    links.push({source:'actor',target:uc.id});
+    frs.forEach(f=>{ usedFR.add(f); links.push({source:uc.id,target:'fr_'+f}); });
+  });
+  [...usedFR].sort().forEach(f=>{
+    nodes.push({id:'fr_'+f, layer:2, color:cssv('--k-fr'), r:8, idText:f.replace('FR-',''), name:f, kind:'fr', _d:{type:'fr',fr:f}});
+  });
+  const G={nodes,links,kind:'usecases'};
+  G.detail = nd => {
+    const d=nd._d;
+    if(d.type==='actor') return `<div class="tid">${nd.name}</div><div class="meta">Ator do sistema. Ligado a ${sp.usecases.length} caso(s) de uso.</div>`;
+    if(d.type==='uc') return `<div><span class="tid mono">${d.uc.id}</span>
+      <span class="badge" style="${badge(cssv(PRI[d.uc.priority].c))}">${d.uc.priority}</span></div>
+      <div class="lab">${d.uc.title}</div>
+      <div class="meta">${d.uc.desc}</div>
+      <div class="meta"><b>Requisitos cobertos:</b><br>${d.frs.length?d.frs.map(f=>`<span class="frtag">${f}</span>`).join(''):'—'}</div>`;
+    if(d.type==='fr') return `<div class="tid mono">${d.fr}</div>
+      <div class="lab">${sp.frText[d.fr]||'(texto não encontrado no spec.md)'}</div>
+      <div class="meta"><b>Casos de uso:</b> ${refsUC(sp,d.fr)}</div>`;
+  };
+  return G;
+}
+
+function buildArch(sp){
+  const a=sp.arch;
+  const nodes=a.nodes.map(n=>({
+    id:n.id, layer:n.layer, color:cssv((KIND[n.kind]||KIND.config).c),
+    r:n.kind==='external'||n.kind==='datastore'?15:(n.kind==='actor'?18:12),
+    idText:'', name:n.label, kind:n.kind, _d:n
+  }));
+  const links=a.links.map(([s,t])=>({source:s,target:t}));
+  const G={nodes,links,kind:'arch'};
+  G.detail = nd => {
+    const n=nd._d;
+    return `<div class="tid">${n.label}</div>
+      <span class="badge" style="${badge(cssv((KIND[n.kind]||KIND.config).c))}">${(KIND[n.kind]||{label:n.kind}).label}</span>
+      ${n.items&&n.items.length?`<div class="meta"><b>Inclui:</b><br>${n.items.map(i=>`<span class="frtag">${i}</span>`).join('')}</div>`:''}
+      ${sp.arch.meta.language?`<div class="meta"><b>Stack:</b> ${sp.arch.meta.language}</div>`:''}`;
+  };
+  return G;
+}
+
+const badge = c => `background:${c}22;color:${c};border:1px solid ${c}55`;
+const mdcode = s => s.replace(/`([^`]+)`/g,'<code>$1</code>');
+const refs = ids => ids.length?ids.map(x=>`<code data-id="${x}">${x}</code>`).join(' '):'—';
+const refsUC = (sp,fr) => { const frByUC={}; sp.tasks.forEach(t=>{if(t.story)(frByUC[t.story]=frByUC[t.story]||new Set())&&t.frs.forEach(f=>frByUC[t.story].add(f));});
+  const list=sp.usecases.filter(u=>frByUC[u.id]&&frByUC[u.id].has(fr)).map(u=>u.id); return list.length?list.join(', '):'—'; };
+
+// ---------------- layout em camadas (compartilhado) ----------------
+function layout(G){
+  const inM=new Map(),outM=new Map(); G.nodes.forEach(n=>{inM.set(n.id,[]);outM.set(n.id,[]);});
+  const byId=new Map(G.nodes.map(n=>[n.id,n]));
+  G.links.forEach(l=>{ if(byId.has(l.source)&&byId.has(l.target)){outM.get(l.source).push(l.target);inM.get(l.target).push(l.source);} });
+  G._in=inM; G._out=outM; G._byId=byId;
+  const layers={}; G.nodes.forEach(n=>(layers[n.layer]=layers[n.layer]||[]).push(n));
+  const COL=210,ROW=52,PADX=95,PADY=60;
+  const keys=Object.keys(layers).map(Number).sort((a,b)=>a-b);
+  const pos=new Map();
+  keys.forEach(k=>{ layers[k].sort((a,b)=>a.id<b.id?-1:1); layers[k].forEach((n,i)=>{n.x=PADX+k*COL;n.y=PADY+i*ROW;pos.set(n.id,n.y);}); });
+  for(let p=0;p<4;p++) keys.forEach(k=>{ const col=layers[k];
+    col.forEach(n=>{ const ps=inM.get(n.id).map(id=>pos.get(id)).filter(v=>v!=null); n.bary=ps.length?ps.reduce((a,b)=>a+b,0)/ps.length:n.y; });
+    col.sort((a,b)=>a.bary-b.bary); col.forEach((n,i)=>{n.y=PADY+i*ROW;pos.set(n.id,n.y);}); });
+  // adjacência para hover
+  const amemo=new Map(),dmemo=new Map();
+  const up=(id,s)=>{ if(amemo.has(id))return amemo.get(id); if(s.has(id))return new Set(); s.add(id);
+    const r=new Set(); inM.get(id).forEach(p=>{r.add(p);up(p,s).forEach(x=>r.add(x));}); amemo.set(id,r);return r; };
+  const dn=(id,s)=>{ if(dmemo.has(id))return dmemo.get(id); if(s.has(id))return new Set(); s.add(id);
+    const r=new Set(); outM.get(id).forEach(c=>{r.add(c);dn(c,s).forEach(x=>r.add(x));}); dmemo.set(id,r);return r; };
+  G.nodes.forEach(n=>{ n._up=up(n.id,new Set()); n._dn=dn(n.id,new Set()); });
+  return G;
+}
+
+// ---------------- render (compartilhado) ----------------
+const svg=d3.select('#svg'); let G, gRoot, zoom, pulseT;
+function buildFor(tab){ const sp=DATA[state.spec];
+  return tab==='usecases'?buildUsecases(sp): tab==='arch'?buildArch(sp): buildDeps(sp); }
 
 function render(animate){
-  G=buildGraph(state.spec);
+  clearInterval(pulseT);
+  G=layout(buildFor(state.tab));
+  const extLabels = state.tab!=='deps';
   svg.selectAll('*').remove();
   const defs=svg.append('defs');
   ['n','c'].forEach(k=>{ defs.append('marker').attr('id','arw-'+k).attr('viewBox','0 -5 10 10').attr('refX',9).attr('refY',0)
     .attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto')
-    .append('path').attr('d','M0,-4L9,0L0,4').attr('fill',k==='c'?pcolor('P1'):'rgba(255,255,255,.28)'); });
+    .append('path').attr('d','M0,-4L9,0L0,4').attr('fill',k==='c'?cssv('--sg-primary'):'rgba(255,255,255,.28)'); });
   gRoot=svg.append('g');
-  rScale=d3.scaleSqrt().domain([0,d3.max(G.nodes,n=>n.blocks)||1]).range([9,24]);
   const links=gRoot.append('g').selectAll('path').data(G.links).join('path')
-    .attr('class',d=>'link'+(d.crit?' crit':''))
-    .attr('marker-end',d=>d.crit?'url(#arw-c)':'url(#arw-n)')
-    .attr('d',d=>edgePath(d));
+    .attr('class',d=>'link'+(d.crit?' crit':'')).attr('marker-end',d=>d.crit?'url(#arw-c)':'url(#arw-n)')
+    .attr('d',d=>edge(d));
   const node=gRoot.append('g').selectAll('g').data(G.nodes,d=>d.id).join('g')
-    .attr('class',d=>'node'+(d.crit?' crit':''))
-    .attr('transform',d=>`translate(${d.x},${d.y})`);
-  node.append('circle').attr('r',d=>rScale(d.blocks)).attr('fill',d=>pcolor(d.priority));
-  node.append('text').attr('class','id').text(d=>d.id.replace(/^T0*/,'T'));
+    .attr('class',d=>'node'+(d.crit?' crit':'')).attr('transform',d=>`translate(${d.x},${d.y})`);
+  node.append('circle').attr('r',d=>d.r).attr('fill',d=>d.color);
+  node.filter(d=>d.idText).append('text').attr('class','id').text(d=>d.idText);
+  if(extLabels) node.append('text').attr('class','ext').attr('x',d=>d.r+7).text(d=>trunc(d.name,22));
   node.on('mouseenter',(e,d)=>hover(d)).on('mouseleave',()=>hover(null)).on('click',(e,d)=>{showDetail(d);e.stopPropagation();});
-  svg.on('click',()=>{clearDetail();});
-  zoom=d3.zoom().scaleExtent([.25,3]).on('zoom',ev=>gRoot.attr('transform',ev.transform));
-  svg.call(zoom);
-  fit();
+  svg.on('click',()=>clearDetail());
+  zoom=d3.zoom().scaleExtent([.2,3]).on('zoom',ev=>gRoot.attr('transform',ev.transform)); svg.call(zoom); fit();
   if(animate!==false){
     node.style('opacity',0).attr('transform',d=>`translate(${d.x},${d.y}) scale(.2)`);
-    node.transition().delay(d=>d.layer*90+Math.random()*60).duration(520).ease(d3.easeBackOut.overshoot(1.3))
+    node.transition().delay(d=>d.layer*110+Math.random()*70).duration(520).ease(d3.easeBackOut.overshoot(1.3))
       .style('opacity',1).attr('transform',d=>`translate(${d.x},${d.y}) scale(1)`);
     links.each(function(){const l=this.getTotalLength();d3.select(this).attr('stroke-dasharray',l).attr('stroke-dashoffset',l);})
-      .transition().delay(d=>{const s=G.nodes.find(n=>n.id===d.source);return (s?s.layer:0)*90+200;}).duration(600)
+      .transition().delay(d=>{const s=G._byId.get(d.source);return (s?s.layer:0)*110+200;}).duration(600)
       .attr('stroke-dashoffset',0).on('end',function(d){ if(!d.crit)d3.select(this).attr('stroke-dasharray',null); });
   }
-  perpetual();
-  applyFilter();
-  buildAside();
+  if(G.nodes.some(n=>n.crit)) perpetual();
+  syncControls(); applyFilter(); buildAside();
 }
-function edgePath(d){ const s=G.nodes.find(n=>n.id===d.source),t=G.nodes.find(n=>n.id===d.target);
+function edge(d){ const s=G._byId.get(d.source),t=G._byId.get(d.target); if(!s||!t)return'';
   const mx=(s.x+t.x)/2; return `M${s.x},${s.y} C${mx},${s.y} ${mx},${t.y} ${t.x},${t.y}`; }
-let pulseT;
-function perpetual(){
-  gRoot.selectAll('.link.crit').attr('stroke-dasharray','8 6');
-  function march(){ gRoot.selectAll('.link.crit').transition().duration(900).ease(d3.easeLinear)
-      .attr('stroke-dashoffset',-14).on('end',function(){d3.select(this).attr('stroke-dashoffset',0);}); }
-  clearInterval(pulseT); march(); pulseT=setInterval(march,900);
-}
-function fit(){ const b=gRoot.node().getBBox(); const sw=svg.node().clientWidth,sh=svg.node().clientHeight;
-  const k=Math.min(sw/(b.width+80),sh/(b.height+80),1.4);
-  const tx=(sw-b.width*k)/2-b.x*k, ty=(sh-b.height*k)/2-b.y*k;
+function perpetual(){ gRoot.selectAll('.link.crit').attr('stroke-dasharray','8 6');
+  const march=()=>gRoot.selectAll('.link.crit').transition().duration(900).ease(d3.easeLinear).attr('stroke-dashoffset',-14).on('end',function(){d3.select(this).attr('stroke-dashoffset',0);});
+  march(); pulseT=setInterval(march,900); }
+function fit(){ const b=gRoot.node().getBBox(),sw=svg.node().clientWidth,sh=svg.node().clientHeight;
+  const k=Math.min(sw/(b.width+90),sh/(b.height+80),1.4), tx=(sw-b.width*k)/2-b.x*k, ty=(sh-b.height*k)/2-b.y*k;
   svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(k)); }
-function hover(d){
-  const nodes=gRoot.selectAll('.node'), links=gRoot.selectAll('.link');
+const trunc=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s;
+
+function hover(d){ const nodes=gRoot.selectAll('.node'),links=gRoot.selectAll('.link');
   if(!d){ nodes.classed('dim',false); links.classed('dim',false); applyFilter(); return; }
-  const keep=new Set([d.id,...d.ancSet,...d.descSet]);
+  const keep=new Set([d.id,...d._up,...d._dn]);
   nodes.classed('dim',n=>!keep.has(n.id));
-  links.classed('dim',l=>!(keep.has(l.source)&&keep.has(l.target)));
-}
-function showDetail(d){
-  const el=document.getElementById('detail');
-  const depd=G.nodes.filter(n=>n.deps.includes(d.id)).map(n=>n.id);
-  el.innerHTML=`<h3>Detalhe da task</h3>
-   <div><span class="tid mono">${d.id}</span>
-     <span class="badge" style="background:${pcolor(d.priority)}22;color:${pcolor(d.priority)};border:1px solid ${pcolor(d.priority)}55">${d.priority}${d.parallel?' · ∥':''}${d.done?' · ✓':''}</span></div>
-   <div class="lab">${d.label.replace(/`([^`]+)`/g,'<code>$1</code>')}</div>
-   <div class="meta"><b>Fase:</b> ${d.phase}${d.story?` · <b>${d.story}</b>`:''}</div>
-   <div class="meta"><b>Bloqueia:</b> ${d.blocks} task(s) direta/indiretamente</div>
-   ${d.frs.length?`<div class="meta"><b>Requisitos:</b><br>${d.frs.map(f=>`<span class="frtag">${f}</span>`).join('')}</div>`:''}
-   <div class="meta"><b>Depende de:</b> ${d.deps.length?d.deps.map(x=>`<code data-id="${x}">${x}</code>`).join(' '):'—'}</div>
-   <div class="meta"><b>É pré-requisito de:</b> ${depd.length?depd.map(x=>`<code data-id="${x}">${x}</code>`).join(' '):'—'}</div>`;
-  el.querySelectorAll('code[data-id]').forEach(c=>c.onclick=ev=>{ev.stopPropagation();const n=G.nodes.find(x=>x.id===c.dataset.id);if(n){showDetail(n);hover(n);}});
-}
-function clearDetail(){ document.getElementById('detail').innerHTML='<h3>Detalhe da task</h3><div class="empty">Clique num nó para ver descrição, requisitos (FR) e dependências.</div>'; }
-function applyFilter(){
-  const q=state.query.trim().toLowerCase();
+  links.classed('dim',l=>!(keep.has(l.source)&&keep.has(l.target))); }
+
+function showDetail(d){ const el=document.getElementById('detail');
+  el.innerHTML=`<h3>Detalhe</h3>${G.detail(d)}`;
+  el.querySelectorAll('code[data-id]').forEach(c=>c.onclick=ev=>{ev.stopPropagation();const n=G._byId.get(c.dataset.id);if(n){showDetail(n);hover(n);}}); }
+function clearDetail(){ document.getElementById('detail').innerHTML='<h3>Detalhe</h3><div class="empty">Clique num nó para ver os detalhes.</div>'; }
+
+function applyFilter(){ const q=state.query.trim().toLowerCase(); const usePri=state.tab!=='arch';
   gRoot.selectAll('.node').style('opacity',d=>{
-    let ok=state.active.has(d.priority);
-    if(ok && q) ok=(d.id.toLowerCase().includes(q)||d.label.toLowerCase().includes(q)||(d.frs.join(' ').toLowerCase().includes(q)));
-    return ok?1:.1;
-  });
-  gRoot.selectAll('.link').style('display',d=>{
-    const s=G.nodes.find(n=>n.id===d.source),t=G.nodes.find(n=>n.id===d.target);
-    return (state.active.has(s.priority)&&state.active.has(t.priority))?null:'none';
-  });
-  gRoot.selectAll('.link.crit').style('display',state.crit?null:'none');
+    let ok = usePri && d._t ? state.active.has(d._t.priority) : true;
+    if(usePri && d.kind==='usecase' && d._d) ok=state.active.has(d._d.uc.priority);
+    if(ok&&q){ const hay=((d.name||'')+' '+(d.idText||'')+' '+(d._t?d._t.label:'')).toLowerCase(); ok=hay.includes(q); }
+    return ok?1:.12; });
+  gRoot.selectAll('.link.crit').style('display',state.crit?null:'none'); }
+
+// ---------------- UI ----------------
+function syncControls(){
+  document.getElementById('tabsub').textContent=TABS.find(t=>t.id===state.tab).sub;
+  document.getElementById('critToggle').classList.toggle('hide',state.tab!=='deps');
+  document.getElementById('priBar').classList.toggle('hide',state.tab==='arch');
+  document.getElementById('hint').textContent = state.tab==='deps'
+    ? 'arraste · zoom · passe o mouse num nó para ver o que ele bloqueia'
+    : state.tab==='usecases' ? 'arraste · zoom · clique num caso de uso ou requisito'
+    : 'arraste · zoom · clique num componente para ver o que ele agrupa';
 }
-function buildAside(){
-  const raw=DATA[state.spec];
-  const cnt={}; raw.forEach(n=>cnt[n.priority]=(cnt[n.priority]||0)+1);
-  document.getElementById('stats').innerHTML=`
-    <div class="stat"><div class="n">${raw.length}</div><div class="l">tasks</div></div>
-    <div class="stat"><div class="n">${G.links.length}</div><div class="l">dependências</div></div>
-    <div class="stat"><div class="n" style="color:var(--c-p1)">${(cnt.P1||0)}</div><div class="l">P1 (MVP)</div></div>
-    <div class="stat"><div class="n" style="color:var(--sg-primary)">${G.critCount}</div><div class="l">no caminho crítico</div></div>`;
-  document.getElementById('legend').innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>
-    `<div class="legrow"><span class="sw" style="background:${pcolor(k)}"></span>${v.label} <span style="margin-left:auto;color:var(--sg-text-softer)">${cnt[k]}</span></div>`).join('');
+function buildAside(){ const sp=DATA[state.spec];
+  const st=document.getElementById('stats'), leg=document.getElementById('legend'), note=document.getElementById('legnote');
+  if(state.tab==='deps'){
+    const cnt={}; sp.tasks.forEach(n=>cnt[n.priority]=(cnt[n.priority]||0)+1);
+    document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Prioridade (cor)';
+    st.innerHTML=stat(sp.tasks.length,'tasks')+stat(G.links.length,'dependências')+stat(cnt.P1||0,'P1 (MVP)','--c-p1')+stat(G.nodes.filter(n=>n.crit).length,'no caminho crítico','--sg-primary');
+    leg.innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>legrow(cssv(v.c),v.label,cnt[k])).join('');
+    note.innerHTML='Tamanho do nó = quantas tasks dependem dele.<br>Anel branco = caminho crítico.';
+  } else if(state.tab==='usecases'){
+    const cnt={}; sp.usecases.forEach(u=>cnt[u.priority]=(cnt[u.priority]||0)+1);
+    document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Prioridade (cor)';
+    st.innerHTML=stat(sp.usecases.length,'casos de uso')+stat(Object.keys(sp.frText).length,'requisitos (FR)')+stat(cnt.P1||0,'P1','--c-p1')+stat(1,'ator');
+    leg.innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>legrow(cssv(v.c),v.label,cnt[k])).join('')
+      +legrow(cssv('--k-actor'),'Ator','')+legrow(cssv('--k-fr'),'Requisito (FR)','');
+    note.innerHTML='Ator → casos de uso → requisitos que cada um cobre.';
+  } else {
+    const kinds={}; sp.arch.nodes.forEach(n=>kinds[n.kind]=(kinds[n.kind]||0)+1);
+    document.getElementById('statsTitle').textContent='Resumo'; document.getElementById('legTitle').textContent='Tipo de componente (cor)';
+    st.innerHTML=stat(sp.arch.nodes.length,'componentes')+stat(sp.arch.links.length,'conexões')+stat(sp.arch.nodes.filter(n=>n.kind==='external'||n.kind==='datastore').length,'externos')+stat((sp.arch.meta.language||'—').split(' ')[0],'linguagem');
+    leg.innerHTML=Object.entries(KIND).filter(([k])=>kinds[k]).map(([k,v])=>legrow(cssv(v.c),v.label,kinds[k])).join('');
+    note.innerHTML='Fluxo da esquerda (usuário) para a direita (sistemas externos e dados). Derivado das pastas e do plan.md — heurístico.';
+  }
 }
+const stat=(n,l,c)=>`<div class="stat"><div class="n"${c?` style="color:${cssv(c)}"`:''}>${n}</div><div class="l">${l}</div></div>`;
+const legrow=(c,l,n)=>`<div class="legrow"><span class="sw" style="background:${c}"></span>${l}${n!==''?` <span style="margin-left:auto;color:var(--sg-text-softer)">${n}</span>`:''}</div>`;
+
+// tabs
+const tabsEl=document.getElementById('tabs');
+TABS.forEach(t=>{ const b=document.createElement('button'); b.textContent=t.label; if(t.id===state.tab)b.className='active';
+  b.onclick=()=>{ state.tab=t.id; [...tabsEl.children].forEach(c=>c.classList.remove('active')); b.classList.add('active'); render(true); }; tabsEl.appendChild(b); });
+// specs
 const specSeg=document.getElementById('specSeg');
 SPECS.forEach(s=>{ const b=document.createElement('button'); b.textContent=s.replace(/^\d+-/,'').replace(/-/g,' ');
   if(s===state.spec)b.className='active'; b.onclick=()=>{state.spec=s;[...specSeg.children].forEach(c=>c.classList.remove('active'));b.classList.add('active');render(true);}; specSeg.appendChild(b); });
-const priBar=document.getElementById('priBar'); priBar.style.padding='4px 6px'; priBar.style.cursor='default';
-priBar.innerHTML=Object.entries(PRI).map(([k,v])=>`<span class="pri-tog" data-k="${k}" title="${v.label}" style="display:inline-flex;align-items:center;gap:4px;margin:0 4px;cursor:pointer"><span class="sw" style="width:11px;height:11px;border-radius:50%;background:${'var('+v.c.match(/--[\w-]+/)[0]+')'}"></span><span style="font-size:11px">${k}</span></span>`).join('');
+if(SPECS.length<2) specSeg.style.display='none';
+// filtro de prioridade
+const priBar=document.getElementById('priBar'); priBar.style.padding='4px 6px';
+priBar.innerHTML=Object.entries(PRI).map(([k,v])=>`<span class="pri-tog" data-k="${k}" title="${v.label}" style="display:inline-flex;align-items:center;gap:4px;margin:0 4px;cursor:pointer"><span class="sw" style="width:11px;height:11px;border-radius:50%;background:var(${v.c})"></span><span style="font-size:11px">${k}</span></span>`).join('');
 priBar.querySelectorAll('.pri-tog').forEach(t=>t.onclick=()=>{const k=t.dataset.k; if(state.active.has(k)){state.active.delete(k);t.style.opacity=.3;}else{state.active.add(k);t.style.opacity=1;} applyFilter();});
 document.getElementById('critToggle').onclick=function(){ state.crit=!state.crit; this.classList.toggle('off',!state.crit); applyFilter(); };
 document.getElementById('search').oninput=e=>{state.query=e.target.value;applyFilter();};
 document.getElementById('replay').onclick=()=>render(true);
+document.getElementById('hproj').textContent=document.title.replace('Mapa do SpecKit','').trim()||'projeto';
 window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(fit,200);});
 render(true);
 </script>

@@ -1,7 +1,7 @@
 {
   "name": "speckit-graph",
   "version": "0.1.0",
-  "description": "Grafo interativo de dependências e prioridades das tasks/RF geradas pelo SpecKit.",
+  "description": "Diagramas interativos do SpecKit: dependências de tasks, casos de uso e arquitetura, num HTML self-contained.",
   "type": "module",
   "bin": {
     "speckit-graph": "bin/cli.mjs"

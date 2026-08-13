@@ -135,9 +135,9 @@ function cmdGenerate(flags) {
 
   const specs = Object.keys(data);
   const totals = specs.map(s => {
-    const n = data[s];
-    const e = n.reduce((a, x) => a + x.deps.length, 0);
-    return `  · ${s}: ${n.length} tasks, ${e} dependências`;
+    const { tasks, usecases, arch } = data[s];
+    const e = tasks.reduce((a, x) => a + x.deps.length, 0);
+    return `  · ${s}: ${tasks.length} tasks (${e} deps), ${usecases.length} casos de uso, ${arch.nodes.length} componentes`;
   }).join('\n');
   console.log(`✓ Grafo gerado: ${out}`);
   console.log(`  Specs (${specs.length}):\n${totals}`);
@@ -151,9 +151,9 @@ function main() {
   try {
     if (sub === 'init') return cmdInit(args.flags);
     if (sub === 'help' || args.flags.help) {
-      console.log(`speckit-graph — grafo interativo de tasks/RF do SpecKit
+      console.log(`speckit-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
 
-  speckit-graph [opções]        gera o HTML do grafo
+  speckit-graph [opções]        gera o HTML (3 abas)
     --specs <dir>   diretório de specs (default: ./specs autodetectado)
     --out <arquivo> saída (default: ./speckit-graph.html)
     --project <nome> nome exibido no cabeçalho
