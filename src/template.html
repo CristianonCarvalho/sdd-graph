@@ -107,6 +107,7 @@
     <div class="seg" id="specSeg"></div>
     <div class="ctrls">
       <input class="search" id="search" placeholder="buscar…">
+      <span class="chip" id="linkBtn" title="copiar link desta visão">🔗 link</span>
       <span class="chip" id="critToggle"><span class="sw" style="background:var(--sg-primary)"></span>caminho crítico</span>
       <span class="chip off" id="doneToggle"><span class="sw" style="background:var(--c-p3)"></span>ocultar concluídas</span>
       <span class="chip" id="priBar"></span>
@@ -341,8 +342,9 @@ function hover(d){ const nodes=gRoot.selectAll('.node'),links=gRoot.selectAll('.
 
 function showDetail(d){ const el=document.getElementById('detail');
   el.innerHTML=`<h3>Detalhe</h3>${G.detail(d)}`;
-  el.querySelectorAll('code[data-id]').forEach(c=>c.onclick=ev=>{ev.stopPropagation();const n=G._byId.get(c.dataset.id);if(n){showDetail(n);hover(n);}}); }
-function clearDetail(){ document.getElementById('detail').innerHTML='<h3>Detalhe</h3><div class="empty">Clique num nó para ver os detalhes.</div>'; }
+  el.querySelectorAll('code[data-id]').forEach(c=>c.onclick=ev=>{ev.stopPropagation();const n=G._byId.get(c.dataset.id);if(n){showDetail(n);hover(n);}});
+  state.sel=d.id; writeHash(); }
+function clearDetail(){ document.getElementById('detail').innerHTML='<h3>Detalhe</h3><div class="empty">Clique num nó para ver os detalhes.</div>'; state.sel=null; writeHash(); }
 
 function applyFilter(){ const q=state.query.trim().toLowerCase(); const usePri=state.tab!=='arch';
   gRoot.selectAll('.node').style('opacity',d=>{
@@ -420,26 +422,66 @@ function buildAside(){ const sp=DATA[state.spec];
 const stat=(n,l,c)=>`<div class="stat"><div class="n"${c?` style="color:${cssv(c)}"`:''}>${n}</div><div class="l">${l}</div></div>`;
 const legrow=(c,l,n)=>`<div class="legrow"><span class="sw" style="background:${c}"></span>${l}${n!==''?` <span style="margin-left:auto;color:var(--sg-text-softer)">${n}</span>`:''}</div>`;
 
+// ---------------- permalink (estado na URL via hash) ----------------
+let hashReady=false;
+function writeHash(){
+  if(!hashReady) return;
+  const p=['tab='+state.tab];
+  if(SPECS.length>1) p.push('spec='+state.spec);
+  if(state.sel) p.push('sel='+state.sel);
+  if(state.query) p.push('q='+encodeURIComponent(state.query));
+  const opt=[]; if(!state.crit)opt.push('nocrit'); if(state.hideDone)opt.push('hidedone'); if(opt.length)p.push('opt='+opt.join(','));
+  if(state.active.size<Object.keys(PRI).length) p.push('pri='+[...state.active].join(','));
+  const h='#'+p.join('&');
+  if(location.hash!==h) history.replaceState(null,'',h);
+}
+function readHash(){
+  const h=location.hash.replace(/^#/,''); if(!h)return null;
+  const q={}; h.split('&').forEach(kv=>{const i=kv.indexOf('=');if(i>0)q[kv.slice(0,i)]=kv.slice(i+1);});
+  if(q.tab&&TABS.some(t=>t.id===q.tab)) state.tab=q.tab;
+  if(q.spec&&SPECS.includes(q.spec)) state.spec=q.spec;
+  if(q.q!=null) state.query=decodeURIComponent(q.q);
+  if(q.opt){ const o=q.opt.split(','); state.crit=!o.includes('nocrit'); state.hideDone=o.includes('hidedone'); }
+  if(q.pri) state.active=new Set(q.pri.split(',').filter(Boolean));
+  return q.sel||null;
+}
+function syncUIToState(){
+  [...tabsEl.children].forEach(b=>b.classList.toggle('active', b.textContent===TABS.find(t=>t.id===state.tab).label));
+  [...specSeg.children].forEach((b,i)=>b.classList.toggle('active', SPECS[i]===state.spec));
+  document.getElementById('search').value=state.query;
+  document.getElementById('critToggle').classList.toggle('off',!state.crit);
+  document.getElementById('doneToggle').classList.toggle('off',state.hideDone);
+  priBar.querySelectorAll('.pri-tog').forEach(t=>t.style.opacity=state.active.has(t.dataset.k)?1:.3);
+}
+
 // tabs
 const tabsEl=document.getElementById('tabs');
 TABS.forEach(t=>{ const b=document.createElement('button'); b.textContent=t.label; if(t.id===state.tab)b.className='active';
-  b.onclick=()=>{ state.tab=t.id; [...tabsEl.children].forEach(c=>c.classList.remove('active')); b.classList.add('active'); render(true); }; tabsEl.appendChild(b); });
+  b.onclick=()=>{ state.tab=t.id; state.sel=null; [...tabsEl.children].forEach(c=>c.classList.remove('active')); b.classList.add('active'); render(true); writeHash(); }; tabsEl.appendChild(b); });
 // specs
 const specSeg=document.getElementById('specSeg');
 SPECS.forEach(s=>{ const b=document.createElement('button'); b.textContent=s.replace(/^\d+-/,'').replace(/-/g,' ');
-  if(s===state.spec)b.className='active'; b.onclick=()=>{state.spec=s;[...specSeg.children].forEach(c=>c.classList.remove('active'));b.classList.add('active');render(true);}; specSeg.appendChild(b); });
+  if(s===state.spec)b.className='active'; b.onclick=()=>{state.spec=s;state.sel=null;[...specSeg.children].forEach(c=>c.classList.remove('active'));b.classList.add('active');render(true);writeHash();}; specSeg.appendChild(b); });
 if(SPECS.length<2) specSeg.style.display='none';
 // filtro de prioridade
 const priBar=document.getElementById('priBar'); priBar.style.padding='4px 6px';
 priBar.innerHTML=Object.entries(PRI).map(([k,v])=>`<span class="pri-tog" data-k="${k}" title="${v.label}" style="display:inline-flex;align-items:center;gap:4px;margin:0 4px;cursor:pointer"><span class="sw" style="width:11px;height:11px;border-radius:50%;background:var(${v.c})"></span><span style="font-size:11px">${k}</span></span>`).join('');
-priBar.querySelectorAll('.pri-tog').forEach(t=>t.onclick=()=>{const k=t.dataset.k; if(state.active.has(k)){state.active.delete(k);t.style.opacity=.3;}else{state.active.add(k);t.style.opacity=1;} applyFilter();});
-document.getElementById('critToggle').onclick=function(){ state.crit=!state.crit; this.classList.toggle('off',!state.crit); applyFilter(); };
-document.getElementById('doneToggle').onclick=function(){ state.hideDone=!state.hideDone; this.classList.toggle('off',!state.hideDone); applyFilter(); };
-document.getElementById('search').oninput=e=>{state.query=e.target.value;applyFilter();};
+priBar.querySelectorAll('.pri-tog').forEach(t=>t.onclick=()=>{const k=t.dataset.k; if(state.active.has(k)){state.active.delete(k);t.style.opacity=.3;}else{state.active.add(k);t.style.opacity=1;} applyFilter();writeHash();});
+document.getElementById('critToggle').onclick=function(){ state.crit=!state.crit; this.classList.toggle('off',!state.crit); applyFilter(); writeHash(); };
+document.getElementById('doneToggle').onclick=function(){ state.hideDone=!state.hideDone; this.classList.toggle('off',!state.hideDone); applyFilter(); writeHash(); };
+document.getElementById('search').oninput=e=>{state.query=e.target.value;applyFilter();writeHash();};
 document.getElementById('replay').onclick=()=>render(true);
+document.getElementById('linkBtn').onclick=function(){ writeHash(); const u=location.href;
+  const done=()=>{ const o=this.textContent; this.textContent='✓ copiado'; setTimeout(()=>this.textContent=o,1400); };
+  if(navigator.clipboard) navigator.clipboard.writeText(u).then(done,done); else done(); };
 document.getElementById('hproj').textContent=document.title.replace('Mapa do SpecKit','').trim()||'projeto';
 window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(fit,200);});
+window.addEventListener('hashchange',()=>{ const s=readHash(); syncUIToState(); render(true); if(s){const n=G._byId.get(s);if(n){showDetail(n);hover(n);setTimeout(()=>centerNode(s),650);}} });
+
+// init: hidrata do hash (permalink), sincroniza UI e renderiza
+const _pending=readHash(); hashReady=true; syncUIToState();
 render(true);
+if(_pending){ const n=G._byId.get(_pending); if(n){ showDetail(n); hover(n); setTimeout(()=>centerNode(_pending),700); } }
 </script>
 </body>
 </html>
