@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Tasks — SpecKit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<!--__D3__-->
+<style>
+  :root{
+    --sg-primary:#FF904D; --sg-crop:#35D07F; --sg-bg:#000000;
+    --sg-text:#ffffff; --sg-text-soft:rgba(255,255,255,.70); --sg-text-softer:rgba(255,255,255,.50);
+    --sg-card-bg:rgba(255,255,255,.05); --sg-card-border:rgba(255,255,255,.10);
+    --sg-glow-soft:rgba(255,144,77,.15); --sg-glow-strong:rgba(255,144,77,.25);
+    --sg-icon-bg:rgba(255,144,77,.15); --sg-icon-border:rgba(255,144,77,.30);
+    --sg-pill-bg:rgba(255,255,255,.04); --sg-pill-border:rgba(255,255,255,.08);
+    --sg-stage-glow:rgba(255,144,77,.06); --sg-accent-2:#FFC766;
+    --c-p1:#FF904D; --c-p2:#FFC766; --c-p3:#35D07F;
+    --c-setup:#6C7A89; --c-found:#8E7CC3; --c-polish:#5B8DEF;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--sg-bg);color:var(--sg-text);font-family:'Inter',sans-serif;overflow:hidden}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .app{display:flex;flex-direction:column;height:100vh}
+  header.top{padding:14px 22px;border-bottom:1px solid var(--sg-card-border);display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(255,144,77,.04),transparent)}
+  header.top h1{font-size:18px;font-weight:800;margin:0;letter-spacing:-.3px}
+  header.top h1 .dot{color:var(--sg-primary)}
+  header.top .sub{font-size:12px;color:var(--sg-text-softer)}
+  .seg{display:flex;background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:9999px;padding:3px;flex-wrap:wrap}
+  .seg button{background:none;border:none;color:var(--sg-text-soft);font:inherit;font-size:12px;font-weight:600;padding:6px 14px;border-radius:9999px;cursor:pointer;transition:.2s;white-space:nowrap}
+  .seg button.active{background:var(--sg-icon-bg);color:var(--sg-primary)}
+  .ctrls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+  .chip{display:inline-flex;align-items:center;gap:7px;background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:9999px;padding:6px 12px;font-size:12px;color:var(--sg-text-soft);cursor:pointer;user-select:none;transition:.2s}
+  .chip:hover{border-color:var(--sg-icon-border)}
+  .chip.off{opacity:.32}
+  .chip .sw{width:11px;height:11px;border-radius:50%}
+  .search{background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:9999px;padding:6px 14px;color:var(--sg-text);font:inherit;font-size:12px;width:160px;outline:none}
+  .search:focus{border-color:var(--sg-icon-border)}
+  main{flex:1;display:flex;min-height:0}
+  .stage{flex:1;position:relative;background:radial-gradient(circle at 50% 45%,var(--sg-stage-glow),transparent 72%);overflow:hidden}
+  .stage svg{width:100%;height:100%;display:block;cursor:grab}
+  .stage svg:active{cursor:grabbing}
+  .hint{position:absolute;left:16px;bottom:14px;font-size:11px;color:var(--sg-text-softer);pointer-events:none}
+  .replay{position:absolute;top:14px;right:14px;z-index:5;background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);color:var(--sg-text-soft);border-radius:9999px;padding:7px 15px;font:inherit;font-size:12px;cursor:pointer;transition:.2s}
+  .replay:hover{background:var(--sg-icon-bg);color:var(--sg-primary)}
+  aside{width:330px;flex:0 0 330px;border-left:1px solid var(--sg-card-border);padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;background:rgba(255,255,255,.015)}
+  .card{background:var(--sg-card-bg);border:1px solid var(--sg-card-border);border-radius:14px;padding:14px 15px;backdrop-filter:blur(10px)}
+  .card h3{margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--sg-text-softer)}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .stat{background:var(--sg-pill-bg);border:1px solid var(--sg-pill-border);border-radius:10px;padding:9px 11px}
+  .stat .n{font-size:22px;font-weight:800;line-height:1}
+  .stat .l{font-size:10.5px;color:var(--sg-text-softer);margin-top:3px}
+  .legrow{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--sg-text-soft);padding:3px 0}
+  .legrow .sw{width:12px;height:12px;border-radius:50%;flex:0 0 auto}
+  .legnote{font-size:11px;color:var(--sg-text-softer);line-height:1.5;margin-top:8px}
+  #detail .empty{font-size:12px;color:var(--sg-text-softer);line-height:1.6}
+  #detail .tid{font-size:13px;font-weight:700}
+  #detail .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px;margin-left:7px;vertical-align:middle}
+  #detail .lab{font-size:12.5px;color:var(--sg-text-soft);line-height:1.55;margin:10px 0}
+  #detail .meta{font-size:11px;color:var(--sg-text-softer);margin:4px 0}
+  #detail .meta b{color:var(--sg-text-soft);font-weight:600}
+  #detail code{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--sg-accent-2);cursor:pointer}
+  #detail code:hover{text-decoration:underline}
+  .frtag{display:inline-block;background:var(--sg-icon-bg);border:1px solid var(--sg-icon-border);color:var(--sg-primary);font-size:10px;font-weight:600;padding:1px 7px;border-radius:6px;margin:2px 4px 2px 0}
+  .link{fill:none;stroke:rgba(255,255,255,.13);stroke-width:1.3px}
+  .link.crit{stroke:var(--sg-primary);stroke-width:2.2px;opacity:.9}
+  .node circle{stroke:rgba(0,0,0,.45);stroke-width:1.5px;cursor:pointer;transition:opacity .25s}
+  .node.crit circle{stroke:#fff;stroke-width:2px}
+  .node text.id{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;fill:#fff;pointer-events:none;text-anchor:middle;dominant-baseline:central}
+  .dim{opacity:.08!important}
+  .link.dim{opacity:.04!important}
+  @media (max-width:820px){ aside{display:none} .search{width:110px} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Mapa de Tasks <span class="dot">·</span> SpecKit</h1>
+      <div class="sub">Dependências & prioridades · projeto <!--__PROJECT__--></div>
+    </div>
+    <div class="seg" id="specSeg"></div>
+    <div class="ctrls">
+      <input class="search" id="search" placeholder="buscar T0.. / texto">
+      <span class="chip" id="critToggle"><span class="sw" style="background:var(--sg-primary)"></span>caminho crítico</span>
+      <span class="chip" id="priBar"></span>
+    </div>
+  </header>
+  <main>
+    <div class="stage">
+      <button class="replay" id="replay">↻ reanimar</button>
+      <svg id="svg"></svg>
+      <div class="hint">arraste para mover · scroll para zoom · passe o mouse num nó para ver o que ele bloqueia</div>
+    </div>
+    <aside>
+      <div class="card"><h3>Resumo</h3><div class="stats" id="stats"></div></div>
+      <div class="card"><h3>Prioridade (cor)</h3><div id="legend"></div>
+        <div class="legnote">Tamanho do nó = quantas tasks dependem dele (quanto maior, mais bloqueante).<br>Anel branco = está no caminho crítico.</div>
+      </div>
+      <div class="card" id="detail"><h3>Detalhe da task</h3><div class="empty">Clique num nó para ver descrição, requisitos (FR) e dependências.</div></div>
+    </aside>
+  </main>
+</div>
+<!--__DATA__-->
+<script>
+const DATA = window.SPECKIT_DATA;
+const SPECS = Object.keys(DATA);
+const PRI = {
+  P1:{c:'var(--c-p1)',label:'P1 · MVP/crítico'},
+  P2:{c:'var(--c-p2)',label:'P2 · importante'},
+  P3:{c:'var(--c-p3)',label:'P3 · desejável'},
+  FOUND:{c:'var(--c-found)',label:'Fundação (bloqueia tudo)'},
+  SETUP:{c:'var(--c-setup)',label:'Setup'},
+  POLISH:{c:'var(--c-polish)',label:'Polish / cross-cutting'}
+};
+const state = { spec:SPECS[0], active:new Set(Object.keys(PRI)), crit:true, query:'' };
+
+function buildGraph(specKey){
+  const raw = DATA[specKey];
+  const byId = new Map(raw.map(n=>[n.id,{...n}]));
+  const nodes = [...byId.values()];
+  const links = [];
+  nodes.forEach(n => n.deps.forEach(d => { if(byId.has(d)) links.push({source:d,target:n.id}); }));
+  const outM=new Map(), inM=new Map();
+  nodes.forEach(n=>{outM.set(n.id,[]);inM.set(n.id,[]);});
+  links.forEach(l=>{outM.get(l.source).push(l.target);inM.get(l.target).push(l.source);});
+  const layer=new Map();
+  function L(id,seen){ if(layer.has(id))return layer.get(id); if(seen.has(id))return 0; seen.add(id);
+    const ps=inM.get(id); let v = ps.length? Math.max(...ps.map(p=>L(p,seen)))+1 : 0; layer.set(id,v); return v; }
+  nodes.forEach(n=>L(n.id,new Set()));
+  nodes.forEach(n=>n.layer=layer.get(n.id));
+  function desc(id,memo,seen){ if(memo.has(id))return memo.get(id); if(seen.has(id))return new Set(); seen.add(id);
+    const s=new Set(); outM.get(id).forEach(c=>{s.add(c); desc(c,memo,seen).forEach(x=>s.add(x));}); memo.set(id,s); return s; }
+  const dmemo=new Map(); nodes.forEach(n=>n.blocks=desc(n.id,dmemo,new Set()).size);
+  const amemo=new Map();
+  function anc(id,seen){ if(amemo.has(id))return amemo.get(id); if(seen.has(id))return new Set(); seen.add(id);
+    const s=new Set(); inM.get(id).forEach(p=>{s.add(p); anc(p,seen).forEach(x=>s.add(x));}); amemo.set(id,s); return s;}
+  nodes.forEach(n=>{ n.ancSet=anc(n.id,new Set()); n.descSet=dmemo.get(n.id)||new Set(); });
+  const bestNext=new Map(), pathLen=new Map();
+  function PL(id){ if(pathLen.has(id))return pathLen.get(id); let best=0,nx=null;
+    outM.get(id).forEach(c=>{const v=PL(c); if(v>best){best=v;nx=c;}}); pathLen.set(id,best+1); bestNext.set(id,nx); return best+1; }
+  nodes.forEach(n=>PL(n.id));
+  let start=null,bl=0; nodes.forEach(n=>{ if(inM.get(n.id).length===0 && pathLen.get(n.id)>bl){bl=pathLen.get(n.id);start=n.id;} });
+  if(!start){ nodes.forEach(n=>{ if(pathLen.get(n.id)>bl){bl=pathLen.get(n.id);start=n.id;} }); }
+  const crit=new Set(); let cur=start; while(cur){crit.add(cur);cur=bestNext.get(cur);}
+  nodes.forEach(n=>n.crit=crit.has(n.id));
+  links.forEach(l=>{ if(crit.has(l.source)&&crit.has(l.target)&&bestNext.get(l.source)===l.target) l.crit=true; });
+  const layers={}; nodes.forEach(n=>(layers[n.layer]=layers[n.layer]||[]).push(n));
+  const maxL=Math.max(...nodes.map(n=>n.layer));
+  const COL=210, ROW=52, PADX=90, PADY=60;
+  Object.values(layers).forEach(col=>col.sort((a,b)=>(a.phaseIdx-b.phaseIdx)|| (a.id<b.id?-1:1)));
+  const pos=new Map();
+  function place(){ Object.keys(layers).sort((a,b)=>a-b).forEach(k=>{ const col=layers[k];
+    col.forEach((n,i)=>{ n.x=PADX+ (+k)*COL; n.y=PADY+i*ROW; pos.set(n.id,n.y); }); }); }
+  place();
+  for(let pass=0;pass<4;pass++){ Object.keys(layers).sort((a,b)=>a-b).forEach(k=>{ const col=layers[k];
+    col.forEach(n=>{ const ps=inM.get(n.id).map(id=>pos.get(id)).filter(v=>v!=null);
+      n.bary = ps.length? ps.reduce((a,b)=>a+b,0)/ps.length : n.y; });
+    col.sort((a,b)=>a.bary-b.bary || a.phaseIdx-b.phaseIdx);
+    col.forEach((n,i)=>{ n.y=PADY+i*ROW; pos.set(n.id,n.y); }); }); }
+  const maxRows=Math.max(...Object.values(layers).map(c=>c.length));
+  const W=PADX*2+maxL*COL, H=PADY*2+(maxRows-1)*ROW;
+  return {nodes,links,W,H,maxL,COL,PADX,critCount:crit.size};
+}
+
+const svg=d3.select('#svg');
+let G, rScale, gRoot, zoom;
+function pcolor(p){ const v=(PRI[p]||PRI.SETUP).c; const m=v.match(/--[\w-]+/); return getComputedStyle(document.documentElement).getPropertyValue(m[0]).trim(); }
+
+function render(animate){
+  G=buildGraph(state.spec);
+  svg.selectAll('*').remove();
+  const defs=svg.append('defs');
+  ['n','c'].forEach(k=>{ defs.append('marker').attr('id','arw-'+k).attr('viewBox','0 -5 10 10').attr('refX',9).attr('refY',0)
+    .attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto')
+    .append('path').attr('d','M0,-4L9,0L0,4').attr('fill',k==='c'?pcolor('P1'):'rgba(255,255,255,.28)'); });
+  gRoot=svg.append('g');
+  rScale=d3.scaleSqrt().domain([0,d3.max(G.nodes,n=>n.blocks)||1]).range([9,24]);
+  const links=gRoot.append('g').selectAll('path').data(G.links).join('path')
+    .attr('class',d=>'link'+(d.crit?' crit':''))
+    .attr('marker-end',d=>d.crit?'url(#arw-c)':'url(#arw-n)')
+    .attr('d',d=>edgePath(d));
+  const node=gRoot.append('g').selectAll('g').data(G.nodes,d=>d.id).join('g')
+    .attr('class',d=>'node'+(d.crit?' crit':''))
+    .attr('transform',d=>`translate(${d.x},${d.y})`);
+  node.append('circle').attr('r',d=>rScale(d.blocks)).attr('fill',d=>pcolor(d.priority));
+  node.append('text').attr('class','id').text(d=>d.id.replace(/^T0*/,'T'));
+  node.on('mouseenter',(e,d)=>hover(d)).on('mouseleave',()=>hover(null)).on('click',(e,d)=>{showDetail(d);e.stopPropagation();});
+  svg.on('click',()=>{clearDetail();});
+  zoom=d3.zoom().scaleExtent([.25,3]).on('zoom',ev=>gRoot.attr('transform',ev.transform));
+  svg.call(zoom);
+  fit();
+  if(animate!==false){
+    node.style('opacity',0).attr('transform',d=>`translate(${d.x},${d.y}) scale(.2)`);
+    node.transition().delay(d=>d.layer*90+Math.random()*60).duration(520).ease(d3.easeBackOut.overshoot(1.3))
+      .style('opacity',1).attr('transform',d=>`translate(${d.x},${d.y}) scale(1)`);
+    links.each(function(){const l=this.getTotalLength();d3.select(this).attr('stroke-dasharray',l).attr('stroke-dashoffset',l);})
+      .transition().delay(d=>{const s=G.nodes.find(n=>n.id===d.source);return (s?s.layer:0)*90+200;}).duration(600)
+      .attr('stroke-dashoffset',0).on('end',function(d){ if(!d.crit)d3.select(this).attr('stroke-dasharray',null); });
+  }
+  perpetual();
+  applyFilter();
+  buildAside();
+}
+function edgePath(d){ const s=G.nodes.find(n=>n.id===d.source),t=G.nodes.find(n=>n.id===d.target);
+  const mx=(s.x+t.x)/2; return `M${s.x},${s.y} C${mx},${s.y} ${mx},${t.y} ${t.x},${t.y}`; }
+let pulseT;
+function perpetual(){
+  gRoot.selectAll('.link.crit').attr('stroke-dasharray','8 6');
+  function march(){ gRoot.selectAll('.link.crit').transition().duration(900).ease(d3.easeLinear)
+      .attr('stroke-dashoffset',-14).on('end',function(){d3.select(this).attr('stroke-dashoffset',0);}); }
+  clearInterval(pulseT); march(); pulseT=setInterval(march,900);
+}
+function fit(){ const b=gRoot.node().getBBox(); const sw=svg.node().clientWidth,sh=svg.node().clientHeight;
+  const k=Math.min(sw/(b.width+80),sh/(b.height+80),1.4);
+  const tx=(sw-b.width*k)/2-b.x*k, ty=(sh-b.height*k)/2-b.y*k;
+  svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(k)); }
+function hover(d){
+  const nodes=gRoot.selectAll('.node'), links=gRoot.selectAll('.link');
+  if(!d){ nodes.classed('dim',false); links.classed('dim',false); applyFilter(); return; }
+  const keep=new Set([d.id,...d.ancSet,...d.descSet]);
+  nodes.classed('dim',n=>!keep.has(n.id));
+  links.classed('dim',l=>!(keep.has(l.source)&&keep.has(l.target)));
+}
+function showDetail(d){
+  const el=document.getElementById('detail');
+  const depd=G.nodes.filter(n=>n.deps.includes(d.id)).map(n=>n.id);
+  el.innerHTML=`<h3>Detalhe da task</h3>
+   <div><span class="tid mono">${d.id}</span>
+     <span class="badge" style="background:${pcolor(d.priority)}22;color:${pcolor(d.priority)};border:1px solid ${pcolor(d.priority)}55">${d.priority}${d.parallel?' · ∥':''}${d.done?' · ✓':''}</span></div>
+   <div class="lab">${d.label.replace(/`([^`]+)`/g,'<code>$1</code>')}</div>
+   <div class="meta"><b>Fase:</b> ${d.phase}${d.story?` · <b>${d.story}</b>`:''}</div>
+   <div class="meta"><b>Bloqueia:</b> ${d.blocks} task(s) direta/indiretamente</div>
+   ${d.frs.length?`<div class="meta"><b>Requisitos:</b><br>${d.frs.map(f=>`<span class="frtag">${f}</span>`).join('')}</div>`:''}
+   <div class="meta"><b>Depende de:</b> ${d.deps.length?d.deps.map(x=>`<code data-id="${x}">${x}</code>`).join(' '):'—'}</div>
+   <div class="meta"><b>É pré-requisito de:</b> ${depd.length?depd.map(x=>`<code data-id="${x}">${x}</code>`).join(' '):'—'}</div>`;
+  el.querySelectorAll('code[data-id]').forEach(c=>c.onclick=ev=>{ev.stopPropagation();const n=G.nodes.find(x=>x.id===c.dataset.id);if(n){showDetail(n);hover(n);}});
+}
+function clearDetail(){ document.getElementById('detail').innerHTML='<h3>Detalhe da task</h3><div class="empty">Clique num nó para ver descrição, requisitos (FR) e dependências.</div>'; }
+function applyFilter(){
+  const q=state.query.trim().toLowerCase();
+  gRoot.selectAll('.node').style('opacity',d=>{
+    let ok=state.active.has(d.priority);
+    if(ok && q) ok=(d.id.toLowerCase().includes(q)||d.label.toLowerCase().includes(q)||(d.frs.join(' ').toLowerCase().includes(q)));
+    return ok?1:.1;
+  });
+  gRoot.selectAll('.link').style('display',d=>{
+    const s=G.nodes.find(n=>n.id===d.source),t=G.nodes.find(n=>n.id===d.target);
+    return (state.active.has(s.priority)&&state.active.has(t.priority))?null:'none';
+  });
+  gRoot.selectAll('.link.crit').style('display',state.crit?null:'none');
+}
+function buildAside(){
+  const raw=DATA[state.spec];
+  const cnt={}; raw.forEach(n=>cnt[n.priority]=(cnt[n.priority]||0)+1);
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="n">${raw.length}</div><div class="l">tasks</div></div>
+    <div class="stat"><div class="n">${G.links.length}</div><div class="l">dependências</div></div>
+    <div class="stat"><div class="n" style="color:var(--c-p1)">${(cnt.P1||0)}</div><div class="l">P1 (MVP)</div></div>
+    <div class="stat"><div class="n" style="color:var(--sg-primary)">${G.critCount}</div><div class="l">no caminho crítico</div></div>`;
+  document.getElementById('legend').innerHTML=Object.entries(PRI).filter(([k])=>cnt[k]).map(([k,v])=>
+    `<div class="legrow"><span class="sw" style="background:${pcolor(k)}"></span>${v.label} <span style="margin-left:auto;color:var(--sg-text-softer)">${cnt[k]}</span></div>`).join('');
+}
+const specSeg=document.getElementById('specSeg');
+SPECS.forEach(s=>{ const b=document.createElement('button'); b.textContent=s.replace(/^\d+-/,'').replace(/-/g,' ');
+  if(s===state.spec)b.className='active'; b.onclick=()=>{state.spec=s;[...specSeg.children].forEach(c=>c.classList.remove('active'));b.classList.add('active');render(true);}; specSeg.appendChild(b); });
+const priBar=document.getElementById('priBar'); priBar.style.padding='4px 6px'; priBar.style.cursor='default';
+priBar.innerHTML=Object.entries(PRI).map(([k,v])=>`<span class="pri-tog" data-k="${k}" title="${v.label}" style="display:inline-flex;align-items:center;gap:4px;margin:0 4px;cursor:pointer"><span class="sw" style="width:11px;height:11px;border-radius:50%;background:${'var('+v.c.match(/--[\w-]+/)[0]+')'}"></span><span style="font-size:11px">${k}</span></span>`).join('');
+priBar.querySelectorAll('.pri-tog').forEach(t=>t.onclick=()=>{const k=t.dataset.k; if(state.active.has(k)){state.active.delete(k);t.style.opacity=.3;}else{state.active.add(k);t.style.opacity=1;} applyFilter();});
+document.getElementById('critToggle').onclick=function(){ state.crit=!state.crit; this.classList.toggle('off',!state.crit); applyFilter(); };
+document.getElementById('search').oninput=e=>{state.query=e.target.value;applyFilter();};
+document.getElementById('replay').onclick=()=>render(true);
+window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(fit,200);});
+render(true);
+</script>
+</body>
+</html>
