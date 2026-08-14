@@ -175,6 +175,27 @@ function cmdGenerate(flags) {
   if (flags.open) { openFile(out); console.log('  Abrindo no navegador…'); }
 }
 
+/** Regera a base (+ --diff, se passado) a cada mudança nos specs/src. --timeline fica manual. */
+function cmdWatch(args) {
+  const flags = args.flags;
+  const specsDir = findSpecsDir(flags.specs);
+  const src = flags.src ? path.resolve(flags.src) : null;
+  if (flags.timeline) { console.error('⚠️  --timeline é ignorado no watch (caro a cada save) — rode sob demanda.'); delete flags.timeline; }
+
+  const stamp = () => new Date().toLocaleTimeString();
+  const gen = open => { try { cmdGenerate({ ...flags, open }); } catch (e) { console.error(`✗ ${stamp()} ${e.message} (mantendo o HTML anterior)`); } };
+  gen(!!flags.open); // build inicial (abre se --open)
+
+  const dirs = [specsDir]; if (src) dirs.push(src);
+  let timer = null;
+  const trigger = () => { clearTimeout(timer); timer = setTimeout(() => { console.error(`↻ ${stamp()} mudança detectada — regerando…`); gen(false); }, 200); };
+  for (const d of dirs) {
+    try { fs.watch(d, { recursive: true }, trigger); console.error(`👀 observando ${d}`); }
+    catch { try { fs.watch(d, trigger); console.error(`👀 observando ${d} (não-recursivo)`); } catch (e) { console.error(`⚠️  não consegui observar ${d}: ${e.message}`); } }
+  }
+  console.error('Watch ativo — salve um arquivo p/ regerar. Ctrl+C para parar.');
+}
+
 const SEV_ICON = { error: '❌', warn: '⚠️ ', info: 'ℹ️ ' };
 
 function cmdDoctor(flags) {
@@ -381,6 +402,7 @@ function main() {
     if (sub === 'snapshot') return cmdSnapshot(args);
     if (sub === 'diff') return cmdDiff(args);
     if (sub === 'timeline') return cmdTimeline(args);
+    if (sub === 'watch') return cmdWatch(args);
     if (sub === 'help' || args.flags.help) {
       console.log(`speckit-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
 
@@ -397,6 +419,10 @@ function main() {
                     novo/concluído/alterado, com card lateral (toggle 🕒 diff)
     --timeline [N]  embute a evolução dos últimos N commits (default 8) num painel
                     visual (📈 timeline): gráfico de progresso + tabela por ponto
+
+  speckit-graph watch [opções de generate]
+    regera a base (+ --diff, se passado) a cada mudança nos specs/src;
+    --timeline é ignorado (caro por save — rode sob demanda). Ctrl+C para parar.
 
   speckit-graph doctor [--specs <dir>] [--src <dir>] [--strict]
     diagnóstico determinístico do plano; --strict sai com código ≠0 se houver erro

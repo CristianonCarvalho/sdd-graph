@@ -36,6 +36,17 @@ speckit-graph [opções]
   --doctor          imprime o diagnóstico do plano (ver abaixo)
 ```
 
+O HTML é um **snapshot estático**: reflete os specs/código/git do momento em que foi gerado. Para atualizar o conteúdo, **regere** (dar F5 sozinho não muda os dados; mas se você regerar no mesmo `--out`, o F5 na aba já mostra a versão nova).
+
+### Atualizar automaticamente (watch)
+
+```bash
+speckit-graph watch --src ./src --open       # regera a cada save; abre uma vez
+speckit-graph watch --src ./src --diff HEAD~1  # inclui a sobreposição de diff (é barato)
+```
+
+Observa `specs/` (e `--src`, se dado) e **regera a base a cada mudança** (debounce de 200 ms) — aí é só dar F5 na aba. O `--timeline` é **ignorado** no watch de propósito (materializa N versões do git, caro a cada save); rode-o sob demanda. `Ctrl+C` para parar. Usa `fs.watch` recursivo (macOS/Windows; em Linux cai para não-recursivo no topo das pastas).
+
 ## Doctor — diagnóstico determinístico do plano
 
 Um "linter" do plano SpecKit: roda sobre o que já é lido e aponta problemas de planejamento, de forma reproduzível (mesmo input → mesma saída), sem rede nem escrita.
