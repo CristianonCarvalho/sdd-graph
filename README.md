@@ -28,7 +28,7 @@ Isso gera `speckit-graph.html` na raiz do projeto e abre no navegador.
 speckit-graph [opções]
   --specs <dir>     diretório de specs (default: ./specs autodetectado)
   --src <dir>       pasta de código p/ a aba Arquitetura (default: <raiz>/src);
-                    em monorepo, aponte só à feature (ex.: src/gov/rfb/consulta)
+                    em monorepo, aponte só à feature (ex.: src/modulos/pedidos/consulta)
   --out <arquivo>   saída (default: ./speckit-graph.html)
   --project <nome>  nome exibido no cabeçalho
   --cdn             usa D3 via CDN (arquivo menor, precisa de internet)
@@ -115,7 +115,7 @@ A base (`--from`) pode ser um **git ref** (comparação instantânea entre commi
 ```bash
 # vs. um commit — materializa os specs daquele ref via `git archive`
 speckit-graph diff --from HEAD~1
-speckit-graph diff --from v1.0 --src src/gov/rfb/consulta   # monorepo: escopa o código
+speckit-graph diff --from v1.0 --src src/modulos/pedidos/consulta   # monorepo: escopa o código
 
 # vs. um snapshot versionado (determinístico, sem git)
 speckit-graph snapshot base.json     # grava o estado atual

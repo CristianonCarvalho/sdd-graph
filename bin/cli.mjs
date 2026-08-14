@@ -321,7 +321,7 @@ function main() {
   speckit-graph [opções]        gera o HTML (3 abas)
     --specs <dir>   diretório de specs (default: ./specs autodetectado)
     --src <dir>     pasta de código p/ a aba Arquitetura (default: <raiz>/src)
-                    use em monorepo p/ escopar só à feature (ex.: src/gov/rfb/consulta)
+                    use em monorepo p/ escopar só à feature (ex.: src/modulos/pedidos/consulta)
     --out <arquivo> saída (default: ./speckit-graph.html)
     --project <nome> nome exibido no cabeçalho
     --cdn           usa D3 via CDN em vez de embutir (arquivo menor, precisa de internet)
