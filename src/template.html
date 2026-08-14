@@ -180,7 +180,7 @@
       <span class="chip" id="svgBtn" title="baixar SVG desta visão">⬇ SVG</span>
       <span class="chip hide" id="focusBadge" title="sair do modo de foco">🎯 <span id="focusId"></span><span class="x">✕</span></span>
       <span class="chip off" id="diagToggle"><span class="sw" style="background:var(--diag-warn)"></span>diagnóstico</span>
-      <span class="chip" id="standupBtn" title="visão de standup (o que está feito, em andamento, a fazer)">📋 standup</span>
+      <span class="chip" id="standupBtn" title="quadro kanban (o que está feito, em andamento, a fazer) — derivado do plano">📋 kanban</span>
       <span class="chip" id="critToggle"><span class="sw" style="background:var(--sg-primary)"></span>caminho crítico</span>
       <span class="chip off" id="doneToggle"><span class="sw" style="background:var(--c-p3)"></span>ocultar concluídas</span>
       <span class="chip" id="priBar"></span>
@@ -520,7 +520,7 @@ function buildDiag(sp){
   list.querySelectorAll('.diagitem[data-nid]').forEach(el=>el.onclick=()=>{const n=G._byId.get(el.dataset.nid);if(n){showDetail(n);hover(n);centerNode(n.id);}});
 }
 
-// ---------------- #16 standup (o que está feito / em andamento / a fazer) ----------------
+// ---------------- #16 kanban (quadro read-only: feito / em andamento / a fazer / bloqueadas) ----------------
 function openStandup(){
   const sp=DATA[state.spec], gd=buildDeps(sp);
   const done=[],prog=[],ready=[],blocked=[];
@@ -532,7 +532,7 @@ function openStandup(){
     return `<div class="col"><h4>${icon} ${title}<span class="cn" style="color:${color}">${arr.length}</span></h4>${items}</div>`; };
   const total=gd.nodes.length, proj=document.getElementById('hproj').textContent;
   const el=document.getElementById('standup');
-  el.innerHTML=`<div class="panel"><div class="phead"><h2>📋 Standup · ${proj}</h2><span class="pdate">${done.length}/${total} concluídas · ${prog.length} em andamento · ${ready.length} prontas · ${blocked.length} bloqueadas</span><button class="close" id="suClose" title="fechar">✕</button></div>
+  el.innerHTML=`<div class="panel"><div class="phead"><h2>📋 Kanban · ${proj}</h2><span class="pdate">${done.length}/${total} concluídas · ${prog.length} em andamento · ${ready.length} prontas · ${blocked.length} bloqueadas</span><button class="close" id="suClose" title="fechar">✕</button></div>
     <div class="cols">${col('Concluídas',cssv('--c-p3'),'✓',done)}${col('Em andamento',cssv('--c-p2'),'⟳',prog)}${col('Prontas p/ começar',cssv('--sg-accent-2'),'▶',ready)}${col('Bloqueadas',cssv('--k-external'),'⛔',blocked)}</div></div>`;
   el.classList.remove('hide');
   el.querySelector('#suClose').onclick=closeStandup;
