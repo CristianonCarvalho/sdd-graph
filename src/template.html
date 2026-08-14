@@ -397,6 +397,50 @@ const refsUC = (sp,fr) => { const frByUC={}; sp.tasks.forEach(t=>{if(t.story)(fr
   const list=sp.usecases.filter(u=>frByUC[u.id]&&frByUC[u.id].has(fr)).map(u=>u.id); return list.length?list.join(', '):'—'; };
 
 // ---------------- layout em camadas (compartilhado) ----------------
+// Grafos grandes usam Sugiyama completo (dummies + minimização de cruzamentos
+// por mediana + alinhamento); abaixo do limite, o barycenter simples basta.
+// Tudo determinístico (desempates por id/chave). Benchmark: layout roda 1x por
+// render — a ~500 nós fica em ~15ms, então o custo extra é imperceptível.
+const SUGIYAMA_MIN=400;
+function sugiyamaLayer(G,inM,outM,byId,layers,keys,COL,ROW,PADX,PADY){
+  // vértices por camada = nós reais + "dummies" inseridos em arestas que pulam camadas
+  const V=new Map(); keys.forEach(k=>V.set(k, layers[k].map(n=>({key:n.id,node:n,layer:k,up:[],dn:[]}))));
+  const vindex=new Map(); V.forEach(col=>col.forEach(v=>vindex.set(v.key,v)));
+  let dummyId=0; const chains=new Map();
+  G.links.forEach(l=>{ const u=byId.get(l.source), w=byId.get(l.target); if(!u||!w||w.layer<=u.layer) return;
+    let prev=vindex.get(u.id); const chain=[];
+    for(let li=u.layer+1; li<w.layer; li++){ const dv={key:'§'+(dummyId++),node:null,layer:li,up:[],dn:[]};
+      if(!V.has(li)) V.set(li,[]); V.get(li).push(dv); vindex.set(dv.key,dv);
+      prev.dn.push(dv); dv.up.push(prev); chain.push(dv); prev=dv; }
+    const wv=vindex.get(w.id); prev.dn.push(wv); wv.up.push(prev);
+    if(chain.length) chains.set(l,chain);
+  });
+  const allKeys=[...V.keys()].sort((a,b)=>a-b);
+  allKeys.forEach(k=>V.get(k).sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0)); // ordem inicial estável
+  const posOf=col=>{ const m=new Map(); col.forEach((v,i)=>m.set(v.key,i)); return m; };
+  const median=(nb,pos)=>{ const ps=nb.map(x=>pos.get(x.key)).filter(x=>x!=null).sort((a,b)=>a-b);
+    if(!ps.length) return -1; const mid=ps.length>>1; return ps.length%2?ps[mid]:(ps[mid-1]+ps[mid])/2; };
+  const reorder=col=>{ const res=new Array(col.length);
+    col.forEach((v,i)=>{ if(v._m<0) res[i]=v; });                 // sem vizinho: fica no lugar
+    const mov=col.filter(v=>v._m>=0).sort((a,b)=> a._m-b._m || (a.key<b.key?-1:1));
+    let mi=0; for(let i=0;i<res.length;i++) if(res[i]===undefined) res[i]=mov[mi++];
+    for(let i=0;i<col.length;i++) col[i]=res[i]; };
+  for(let r=0;r<4;r++){                                            // varreduras desce/sobe
+    for(let i=1;i<allKeys.length;i++){ const col=V.get(allKeys[i]), pp=posOf(V.get(allKeys[i-1]));
+      col.forEach(v=>v._m=median(v.up,pp)); reorder(col); }
+    for(let i=allKeys.length-2;i>=0;i--){ const col=V.get(allKeys[i]), np=posOf(V.get(allKeys[i+1]));
+      col.forEach(v=>v._m=median(v.dn,np)); reorder(col); }
+  }
+  allKeys.forEach(k=>V.get(k).forEach((v,i)=>{ v.x=PADX+k*COL; v.y=PADY+i*ROW; })); // coords iniciais
+  for(let pass=0; pass<3; pass++) allKeys.forEach(k=>{ const col=V.get(k);           // alinhamento
+    col.forEach(v=>{ const nb=v.up.concat(v.dn); if(!nb.length){ v.ty=null; return; }
+      const ys=nb.map(x=>x.y).sort((a,b)=>a-b), mid=ys.length>>1; v.ty=ys.length%2?ys[mid]:(ys[mid-1]+ys[mid])/2; });
+    col.forEach(v=>{ if(v.ty!=null) v.y=v.ty; });
+    for(let i=1;i<col.length;i++) if(col[i].y<col[i-1].y+ROW) col[i].y=col[i-1].y+ROW; // sem sobreposição
+  });
+  V.forEach(col=>col.forEach(v=>{ if(v.node){ v.node.x=v.x; v.node.y=v.y; } }));
+  G.links.forEach(l=>{ const ch=chains.get(l); l.waypoints=(ch&&ch.length)?ch.map(v=>({x:v.x,y:v.y})):null; });
+}
 function layout(G){
   const inM=new Map(),outM=new Map(); G.nodes.forEach(n=>{inM.set(n.id,[]);outM.set(n.id,[]);});
   const byId=new Map(G.nodes.map(n=>[n.id,n]));
@@ -405,11 +449,15 @@ function layout(G){
   const layers={}; G.nodes.forEach(n=>(layers[n.layer]=layers[n.layer]||[]).push(n));
   const COL=210,ROW=52,PADX=95,PADY=60;
   const keys=Object.keys(layers).map(Number).sort((a,b)=>a-b);
-  const pos=new Map();
-  keys.forEach(k=>{ layers[k].sort((a,b)=>a.id<b.id?-1:1); layers[k].forEach((n,i)=>{n.x=PADX+k*COL;n.y=PADY+i*ROW;pos.set(n.id,n.y);}); });
-  for(let p=0;p<4;p++) keys.forEach(k=>{ const col=layers[k];
-    col.forEach(n=>{ const ps=inM.get(n.id).map(id=>pos.get(id)).filter(v=>v!=null); n.bary=ps.length?ps.reduce((a,b)=>a+b,0)/ps.length:n.y; });
-    col.sort((a,b)=>a.bary-b.bary); col.forEach((n,i)=>{n.y=PADY+i*ROW;pos.set(n.id,n.y);}); });
+  if(G.nodes.length>=SUGIYAMA_MIN){
+    sugiyamaLayer(G,inM,outM,byId,layers,keys,COL,ROW,PADX,PADY);
+  } else {
+    const pos=new Map();
+    keys.forEach(k=>{ layers[k].sort((a,b)=>a.id<b.id?-1:1); layers[k].forEach((n,i)=>{n.x=PADX+k*COL;n.y=PADY+i*ROW;pos.set(n.id,n.y);}); });
+    for(let p=0;p<4;p++) keys.forEach(k=>{ const col=layers[k];
+      col.forEach(n=>{ const ps=inM.get(n.id).map(id=>pos.get(id)).filter(v=>v!=null); n.bary=ps.length?ps.reduce((a,b)=>a+b,0)/ps.length:n.y; });
+      col.sort((a,b)=>a.bary-b.bary); col.forEach((n,i)=>{n.y=PADY+i*ROW;pos.set(n.id,n.y);}); });
+  }
   // adjacência para hover
   const amemo=new Map(),dmemo=new Map();
   const up=(id,s)=>{ if(amemo.has(id))return amemo.get(id); if(s.has(id))return new Set(); s.add(id);
@@ -475,6 +523,10 @@ function render(animate){
   syncControls(); applyFilter(); buildAside(); drawMinimap(); updateSearch();
 }
 function edge(d){ const s=G._byId.get(d.source),t=G._byId.get(d.target); if(!s||!t)return'';
+  if(d.waypoints&&d.waypoints.length){ const pts=[{x:s.x,y:s.y},...d.waypoints,{x:t.x,y:t.y}];
+    let p='M'+pts[0].x+','+pts[0].y;
+    for(let i=1;i<pts.length;i++){ const a=pts[i-1],b=pts[i],mx=(a.x+b.x)/2; p+=` C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}`; }
+    return p; }
   const mx=(s.x+t.x)/2; return `M${s.x},${s.y} C${mx},${s.y} ${mx},${t.y} ${t.x},${t.y}`; }
 function perpetual(){ gRoot.selectAll('.link.crit').attr('stroke-dasharray','8 6');
   const march=()=>gRoot.selectAll('.link.crit').transition().duration(900).ease(d3.easeLinear).attr('stroke-dashoffset',-14).on('end',function(){d3.select(this).attr('stroke-dashoffset',0);});
