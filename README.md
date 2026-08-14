@@ -143,6 +143,21 @@ speckit-graph --diff HEAD~1 --open        # o que mudou desde o commit anterior
 speckit-graph --diff base.json --open     # desde um snapshot salvo
 ```
 
+**Timeline (N versões)** — acompanha a **evolução ao longo de vários commits**: progresso por ponto, concluídas/novas entre pontos, contagem de erros/avisos e uma tendência em sparkline. Determinístico (as datas vêm do git, não do relógio).
+
+```bash
+speckit-graph timeline --last 8       # últimos 8 commits que tocaram os specs + estado atual
+speckit-graph timeline --refs v1.0,v1.1,HEAD
+speckit-graph timeline --json tl.json # JSON canônico em vez de Markdown
+```
+
+```
+Progresso: `▂▃▅▆█`  11% → 80%  (5 pontos)
+| Ponto     | Data       | Progresso | Concluídas | Novas | Erros | Avisos |
+| a1b2c3d   | 2026-08-10 | 40% (4/10)|     2      |   1   |   0   |   1    |
+No período: 6 concluída(s) · 2 nova(s) · 0 removida(s) · achados +1 / −3
+```
+
 ## Comando /speckit-graph (Claude Code, GitHub Copilot e Kiro)
 
 Instale o comando `/speckit-graph` nas três ferramentas de IA de uma vez:

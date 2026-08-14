@@ -13,6 +13,7 @@ import { renderHTML } from '../src/template.mjs';
 import { buildGateReport, stringifyCanonical, gateMarkdown } from '../src/gate.mjs';
 import { buildSummary } from '../src/summary.mjs';
 import { buildSnapshot, diffReport, diffMarkdown } from '../src/diff.mjs';
+import { buildTimeline, timelineMarkdown } from '../src/timeline.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -245,11 +246,19 @@ function cmdSnapshot(args) {
   console.error(`✓ snapshot gravado: ${dest} (${n} spec(s))`);
 }
 
-/** Materializa os specs (e o src, se dentro do repo) de um git ref e faz o snapshot. */
+/** Raiz do repositório git que contém specsDir, ou null se não houver. */
+function gitRootOf(specsDir) {
+  try { return execSync('git rev-parse --show-toplevel', { cwd: specsDir, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); }
+  catch { return null; }
+}
+
+/**
+ * Materializa os specs (e o src, se dentro do repo) de um git ref e faz o snapshot.
+ * Lança Error em falha (não encerra o processo) — o chamador decide como tratar.
+ */
 function snapshotFromGitRef(ref, specsDir, src) {
-  let root;
-  try { root = execSync('git rev-parse --show-toplevel', { cwd: specsDir, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); }
-  catch { console.error(`✗ '${ref}' não é um arquivo .json nem um repositório git acessível. Use --from <snapshot.json> ou rode dentro de um repo git.`); process.exit(2); }
+  const root = gitRootOf(specsDir);
+  if (!root) throw new Error(`'${ref}': não é um repositório git acessível`);
   const rel = p => path.relative(root, path.resolve(p)).split(path.sep).join('/');
   const relSpecs = rel(specsDir);
   const relSrc = src ? rel(src) : null;
@@ -262,11 +271,20 @@ function snapshotFromGitRef(ref, specsDir, src) {
     const tmpSrc = relSrc && !relSrc.startsWith('..') ? path.join(tmp, relSrc) : null;
     return buildSnapshot(parseSpecs(tmpSpecs, { src: tmpSrc && fs.existsSync(tmpSrc) ? tmpSrc : null }));
   } catch (e) {
-    console.error(`✗ não consegui ler os specs do ref '${ref}': ${String(e.stderr || e.message).trim()}`);
-    process.exit(2);
+    throw new Error(`ref '${ref}': ${String(e.stderr || e.message).trim()}`);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+}
+
+/** Commits (mais recentes primeiro → retornados do mais antigo p/ o mais novo) que tocaram os specs. */
+function gitCommitsTouchingSpecs(n, specsDir) {
+  const root = gitRootOf(specsDir);
+  if (!root) { console.error('✗ não é um repositório git — use --refs <a,b,c> ou rode dentro de um repo.'); process.exit(2); }
+  const rel = path.relative(root, path.resolve(specsDir)).split(path.sep).join('/');
+  const raw = execSync(`git log -n ${n} --format=%h%x09%ad --date=short -- '${rel}'`, { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  if (!raw) return [];
+  return raw.split('\n').map(l => { const [ref, date] = l.split('\t'); return { ref, label: ref, date }; }).reverse();
 }
 
 /** Resolve a base do diff: um snapshot .json salvo ou um git ref materializado. */
@@ -280,7 +298,8 @@ function resolveBaseSnapshot(fromArg, specsDir, src) {
     console.error('✗ arquivo não é um snapshot do speckit-graph (gere com `speckit-graph snapshot`).');
     process.exit(2);
   }
-  return snapshotFromGitRef(fromArg, specsDir, src);
+  try { return snapshotFromGitRef(fromArg, specsDir, src); }
+  catch (e) { console.error(`✗ ${e.message} — use --from <snapshot.json> ou rode dentro de um repo git.`); process.exit(2); }
 }
 
 function cmdDiff(args) {
@@ -305,6 +324,41 @@ function cmdDiff(args) {
   else console.log(out);
 }
 
+function cmdTimeline(args) {
+  const flags = args.flags;
+  const specsDir = findSpecsDir(flags.specs);
+  const src = flags.src ? path.resolve(flags.src) : null;
+  const project = flags.project || deriveProjectName(specsDir);
+
+  // pontos: refs explícitos (--refs a,b,c) ou os últimos N commits que tocaram os specs (--last N, default 5)
+  let refPoints;
+  if (typeof flags.refs === 'string') {
+    refPoints = flags.refs.split(',').map(s => s.trim()).filter(Boolean).map(r => ({ ref: r, label: r, date: null }));
+  } else {
+    const n = Math.max(1, parseInt(flags.last, 10) || 5);
+    refPoints = gitCommitsTouchingSpecs(n, specsDir);
+    if (!refPoints.length) { console.error('✗ nenhum commit tocou os specs — use --refs <a,b,c>.'); process.exit(2); }
+  }
+
+  const points = [];
+  for (const rp of refPoints) {
+    try { points.push({ label: rp.label, date: rp.date, snapshot: snapshotFromGitRef(rp.ref, specsDir, src) }); }
+    catch (e) { console.error(`  ⚠️  pulando ${rp.ref}: ${e.message}`); }
+  }
+  // ponto final: estado atual (working tree), a menos que --no-current
+  if (flags['no-current'] !== true) {
+    points.push({ label: 'atual', date: null, snapshot: buildSnapshot(parseSpecs(specsDir, { src })) });
+  }
+  if (points.length < 2) { console.error('✗ timeline precisa de ao menos 2 pontos válidos.'); process.exit(2); }
+
+  const tl = buildTimeline(points);
+  const wantJson = 'json' in flags;
+  const out = wantJson ? stringifyCanonical(tl) : timelineMarkdown(tl, { project });
+  const dest = (typeof flags.json === 'string' && flags.json) || (typeof flags.out === 'string' && flags.out) || null;
+  if (dest) { fs.writeFileSync(path.resolve(dest), out); console.error(`✓ timeline: ${path.resolve(dest)}`); }
+  else console.log(out);
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const sub = args._[0];
@@ -315,6 +369,7 @@ function main() {
     if (sub === 'summary' || 'summary' in args.flags) return cmdSummary(args.flags);
     if (sub === 'snapshot') return cmdSnapshot(args);
     if (sub === 'diff') return cmdDiff(args);
+    if (sub === 'timeline') return cmdTimeline(args);
     if (sub === 'help' || args.flags.help) {
       console.log(`speckit-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
 
@@ -352,6 +407,13 @@ function main() {
     --from HEAD~1      compara com um commit (materializa os specs do ref)
     --from base.json   compara com um snapshot salvo
     --json [arquivo]   emite JSON canônico (default: Markdown no stdout)
+    --out <arquivo>    grava a saída em arquivo
+
+  speckit-graph timeline [opções]   evolução do plano ao longo de N pontos
+    --last <N>         últimos N commits que tocaram os specs (default: 5)
+    --refs <a,b,c>     pontos explícitos (refs git) em vez de --last
+    --no-current       não inclui o estado atual (working tree) como último ponto
+    --json [arquivo]   JSON canônico (default: Markdown: tabela + sparkline)
     --out <arquivo>    grava a saída em arquivo
 
   speckit-graph init [--global] [--target <lista>]
