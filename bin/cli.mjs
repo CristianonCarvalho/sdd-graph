@@ -8,7 +8,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFile, execSync } from 'node:child_process';
-import { parseSpecs } from '../src/parse.mjs';
+import { parseProject } from '../src/adapters/index.mjs';
 import { renderHTML } from '../src/template.mjs';
 import { buildGateReport, stringifyCanonical, gateMarkdown } from '../src/gate.mjs';
 import { buildSummary } from '../src/summary.mjs';
@@ -134,7 +134,7 @@ function cmdGenerate(flags) {
   const selfContained = !flags.cdn;
   const src = flags.src ? path.resolve(flags.src) : null; // escopo do código p/ arquitetura (monorepo)
 
-  const data = parseSpecs(specsDir, { src });
+  const data = parseProject({ specsDir, src, adapter: flags.adapter });
 
   // --diff <snapshot.json | git-ref>: embute o diff (novo/concluído/alterado) para a sobreposição visual
   let diffLabel = null;
@@ -201,7 +201,7 @@ const SEV_ICON = { error: '❌', warn: '⚠️ ', info: 'ℹ️ ' };
 function cmdDoctor(flags) {
   const specsDir = findSpecsDir(flags.specs);
   const src = flags.src ? path.resolve(flags.src) : null;
-  const data = parseSpecs(specsDir, { src });
+  const data = parseProject({ specsDir, src, adapter: flags.adapter });
   let totalError = 0;
   for (const slug of Object.keys(data)) {
     const { diagnostics, confidence } = data[slug];
@@ -224,7 +224,7 @@ function cmdCheck(flags) {
   try {
     const specsDir = findSpecsDir(flags.specs);
     const src = flags.src ? path.resolve(flags.src) : null;
-    data = parseSpecs(specsDir, { src });
+    data = parseProject({ specsDir, src, adapter: flags.adapter });
   } catch (e) { console.error('✗ ' + e.message); process.exit(2); }
 
   const baselinePath = flags.baseline ? path.resolve(flags.baseline) : null;
@@ -259,7 +259,7 @@ function cmdSummary(flags) {
   const specsDir = findSpecsDir(flags.specs);
   const src = flags.src ? path.resolve(flags.src) : null;
   const project = flags.project || deriveProjectName(specsDir);
-  const md = buildSummary(parseSpecs(specsDir, { src }), project);
+  const md = buildSummary(parseProject({ specsDir, src, adapter: flags.adapter }), project);
   if (typeof flags.summary === 'string') {
     const out = path.resolve(flags.summary);
     fs.writeFileSync(out, md); console.error(`✓ resumo: ${out}`);
@@ -270,7 +270,7 @@ function cmdSnapshot(args) {
   const flags = args.flags;
   const specsDir = findSpecsDir(flags.specs);
   const src = flags.src ? path.resolve(flags.src) : null;
-  const data = parseSpecs(specsDir, { src });
+  const data = parseProject({ specsDir, src, adapter: flags.adapter });
   const dest = path.resolve(args._[1] || flags.out || 'speckit-graph.snapshot.json');
   fs.writeFileSync(dest, stringifyCanonical(buildSnapshot(data)));
   const n = Object.keys(data).length;
@@ -300,7 +300,7 @@ function snapshotFromGitRef(ref, specsDir, src) {
     execSync(`git archive ${ref} -- ${paths.map(p => `'${p}'`).join(' ')} | tar -x -C '${tmp}'`, { cwd: root, stdio: ['ignore', 'ignore', 'pipe'] });
     const tmpSpecs = path.join(tmp, relSpecs);
     const tmpSrc = relSrc && !relSrc.startsWith('..') ? path.join(tmp, relSrc) : null;
-    return buildSnapshot(parseSpecs(tmpSpecs, { src: tmpSrc && fs.existsSync(tmpSrc) ? tmpSrc : null }));
+    return buildSnapshot(parseProject({ specsDir: tmpSpecs, src: tmpSrc && fs.existsSync(tmpSrc) ? tmpSrc : null }));
   } catch (e) {
     throw new Error(`ref '${ref}': ${String(e.stderr || e.message).trim()}`);
   } finally {
@@ -344,7 +344,7 @@ function cmdDiff(args) {
     console.error('       speckit-graph diff --from base.json  (compara com um snapshot salvo)');
     process.exit(2);
   }
-  const to = buildSnapshot(parseSpecs(specsDir, { src }));
+  const to = buildSnapshot(parseProject({ specsDir, src, adapter: flags.adapter }));
   const from = resolveBaseSnapshot(fromArg, specsDir, src);
   const rep = diffReport(from, to);
   const project = flags.project || deriveProjectName(specsDir);
@@ -370,7 +370,7 @@ function collectTimelinePoints(specsDir, src, opts = {}) {
     try { points.push({ label: rp.label, date: rp.date, snapshot: snapshotFromGitRef(rp.ref, specsDir, src) }); }
     catch (e) { console.error(`  ⚠️  pulando ${rp.ref}: ${e.message}`); }
   }
-  if (!opts.noCurrent) points.push({ label: 'atual', date: null, snapshot: buildSnapshot(parseSpecs(specsDir, { src })) });
+  if (!opts.noCurrent) points.push({ label: 'atual', date: null, snapshot: buildSnapshot(parseProject({ specsDir, src, adapter: opts.adapter })) });
   return points;
 }
 
@@ -410,6 +410,7 @@ function main() {
     --specs <dir>   diretório de specs (default: ./specs autodetectado)
     --src <dir>     pasta de código p/ a aba Arquitetura (default: <raiz>/src)
                     use em monorepo p/ escopar só à feature (ex.: src/modulos/pedidos/consulta)
+    --adapter <n>   força o adapter SDD (default: autodetecta). Hoje: speckit
     --out <arquivo> saída (default: ./speckit-graph.html)
     --project <nome> nome exibido no cabeçalho
     --cdn           usa D3 via CDN em vez de embutir (arquivo menor, precisa de internet)
