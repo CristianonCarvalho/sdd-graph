@@ -1,4 +1,4 @@
-// speckit-graph — Timeline: evolução do plano ao longo de N pontos (commits/snapshots).
+// sdd-graph — Timeline: evolução do plano ao longo de N pontos (commits/snapshots).
 // Puro e determinístico: dado o mesmo histórico, mesma saída. Reusa o diffReport
 // para calcular o que mudou entre pontos consecutivos.
 import { diffReport } from './diff.mjs';
@@ -46,7 +46,7 @@ export function buildTimeline(points) {
     }
     return { label: pt.label, date: pt.date || null, progress, findings, delta };
   });
-  return { tool: 'speckit-graph', schemaVersion: 1, kind: 'timeline', points: pts };
+  return { tool: 'sdd-graph', schemaVersion: 1, kind: 'timeline', points: pts };
 }
 
 const BLOCKS = '▁▂▃▄▅▆▇█';
@@ -59,7 +59,7 @@ export function sparkline(values) {
 /** Relatório da timeline em Markdown (tabela + tendência). Determinístico. */
 export function timelineMarkdown(tl, opts = {}) {
   const proj = opts.project ? ` — ${opts.project}` : '';
-  const L = ['### 📈 speckit-graph — timeline do plano' + proj, ''];
+  const L = ['### 📈 sdd-graph — timeline do plano' + proj, ''];
   const spark = sparkline(tl.points.map(p => p.progress.pct));
   if (spark) {
     const first = tl.points[0].progress.pct, last = tl.points[tl.points.length - 1].progress.pct;
@@ -76,6 +76,6 @@ export function timelineMarkdown(tl, opts = {}) {
     return a;
   }, { completed: 0, added: 0, removed: 0, fa: 0, fr: 0 });
   L.push('', `No período: **${acc.completed} concluída(s)** · ${acc.added} nova(s) · ${acc.removed} removida(s) · achados +${acc.fa} / −${acc.fr}`);
-  L.push('', '<sub>gerado por speckit-graph — determinístico</sub>');
+  L.push('', '<sub>gerado por sdd-graph — determinístico</sub>');
   return L.join('\n');
 }

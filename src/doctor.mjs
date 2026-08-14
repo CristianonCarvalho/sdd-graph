@@ -1,4 +1,4 @@
-// speckit-graph — Doctor: diagnóstico determinístico do plano SpecKit.
+// sdd-graph — Doctor: diagnóstico determinístico do plano SpecKit.
 // Função pura: mesmas entradas => mesmas saídas (ordenadas por severidade/id).
 // Não lê arquivos, não usa rede/relógio. Consumido pelo CLI (--doctor), pelo
 // gate de CI (--check) e, futuramente, pela sobreposição visual no HTML.

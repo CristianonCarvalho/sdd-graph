@@ -1,4 +1,4 @@
-// speckit-graph — Índice de confiança (0–100): leitura honesta de "quanto
+// sdd-graph — Índice de confiança (0–100): leitura honesta de "quanto
 // confiar neste grafo". Puro e determinístico (só razões inteiras + pesos fixos).
 //
 // Dimensões medidas hoje (as que temos como aferir sem chutar):

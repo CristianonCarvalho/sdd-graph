@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// speckit-graph — CLI
+// sdd-graph — CLI
 // Uso:
-//   speckit-graph [--specs <dir>] [--out <arquivo>] [--cdn] [--open] [--project <nome>]
-//   speckit-graph init [--global]
+//   sdd-graph [--specs <dir>] [--out <arquivo>] [--cdn] [--open] [--project <nome>]
+//   sdd-graph init [--global]
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -55,40 +55,49 @@ function findSpecsDir(explicit) {
 const TARGETS = {
   claude: {
     label: 'Claude Code',
-    src: 'claude/speckit-graph.md',
-    invoke: '/speckit-graph',
-    project: cwd => path.join(cwd, '.claude', 'commands', 'speckit-graph.md'),
-    global: () => path.join(os.homedir(), '.claude', 'commands', 'speckit-graph.md'),
+    src: 'claude/sdd-graph.md',
+    invoke: '/sdd-graph',
+    project: cwd => path.join(cwd, '.claude', 'commands', 'sdd-graph.md'),
+    global: () => path.join(os.homedir(), '.claude', 'commands', 'sdd-graph.md'),
   },
   copilot: {
     label: 'GitHub Copilot (VS Code/JetBrains)',
-    src: 'copilot/speckit-graph.prompt.md',
-    invoke: '/speckit-graph',
-    project: cwd => path.join(cwd, '.github', 'prompts', 'speckit-graph.prompt.md'),
+    src: 'copilot/sdd-graph.prompt.md',
+    invoke: '/sdd-graph',
+    project: cwd => path.join(cwd, '.github', 'prompts', 'sdd-graph.prompt.md'),
     global: null, // prompt files não têm pasta global portável — sempre no workspace
   },
   'copilot-cli': {
     label: 'GitHub Copilot CLI (extensão — slash command direto)',
     src: 'copilot-cli/extension.mjs',
-    invoke: '/speckit-graph',
-    project: cwd => path.join(cwd, '.github', 'extensions', 'speckit-graph', 'extension.mjs'),
+    invoke: '/sdd-graph',
+    project: cwd => path.join(cwd, '.github', 'extensions', 'sdd-graph', 'extension.mjs'),
     global: null, // extensões são por-projeto na doc atual (.github/extensions/)
   },
   'copilot-cli-agent': {
     label: 'GitHub Copilot CLI (custom agent — alternativa)',
-    src: 'copilot-cli/speckit-graph.agent.md',
-    invoke: '/agent → speckit-graph  (ou: copilot --agent speckit-graph)',
+    src: 'copilot-cli/sdd-graph.agent.md',
+    invoke: '/agent → sdd-graph  (ou: copilot --agent sdd-graph)',
     default: false, // só instala quando pedido explicitamente
-    project: cwd => path.join(cwd, '.github', 'agents', 'speckit-graph.agent.md'),
-    global: () => path.join(os.homedir(), '.copilot', 'agents', 'speckit-graph.agent.md'),
+    project: cwd => path.join(cwd, '.github', 'agents', 'sdd-graph.agent.md'),
+    global: () => path.join(os.homedir(), '.copilot', 'agents', 'sdd-graph.agent.md'),
   },
   kiro: {
     label: 'Kiro',
-    src: 'kiro/speckit-graph.md',
-    invoke: '/speckit-graph',
-    project: cwd => path.join(cwd, '.kiro', 'steering', 'speckit-graph.md'),
-    global: () => path.join(os.homedir(), '.kiro', 'steering', 'speckit-graph.md'),
+    src: 'kiro/sdd-graph.md',
+    invoke: '/sdd-graph',
+    project: cwd => path.join(cwd, '.kiro', 'steering', 'sdd-graph.md'),
+    global: () => path.join(os.homedir(), '.kiro', 'steering', 'sdd-graph.md'),
   },
+};
+
+// Caminhos do nome antigo (speckit-graph), só para a transição do rename (--keep-legacy/--migrate).
+const LEGACY_TARGETS = {
+  claude: { project: cwd => path.join(cwd, '.claude', 'commands', 'speckit-graph.md'), global: () => path.join(os.homedir(), '.claude', 'commands', 'speckit-graph.md') },
+  copilot: { project: cwd => path.join(cwd, '.github', 'prompts', 'speckit-graph.prompt.md') },
+  'copilot-cli': { project: cwd => path.join(cwd, '.github', 'extensions', 'speckit-graph', 'extension.mjs') },
+  'copilot-cli-agent': { project: cwd => path.join(cwd, '.github', 'agents', 'speckit-graph.agent.md'), global: () => path.join(os.homedir(), '.copilot', 'agents', 'speckit-graph.agent.md') },
+  kiro: { project: cwd => path.join(cwd, '.kiro', 'steering', 'speckit-graph.md'), global: () => path.join(os.homedir(), '.kiro', 'steering', 'speckit-graph.md') },
 };
 
 function cmdInit(flags) {
@@ -112,6 +121,23 @@ function cmdInit(flags) {
     console.log(`✓ ${t.label} (${scope})`);
     console.log(`    arquivo:  ${dest}`);
     console.log(`    invocar:  ${t.invoke}`);
+
+    // transição do rename speckit-graph → sdd-graph (--keep-legacy instala também o nome
+    // antigo; --migrate remove o que estiver instalado com o nome antigo)
+    const lt = LEGACY_TARGETS[key];
+    if (lt) {
+      const legacyDest = (flags.global && lt.global) ? lt.global() : lt.project(cwd);
+      if (legacyDest !== dest) {
+        if (flags['keep-legacy']) {
+          fs.mkdirSync(path.dirname(legacyDest), { recursive: true });
+          fs.copyFileSync(path.join(ROOT, 'commands', t.src), legacyDest);
+          console.log(`    alias:    ${legacyDest} (--keep-legacy)`);
+        } else if (flags.migrate && fs.existsSync(legacyDest)) {
+          fs.rmSync(legacyDest, { force: true });
+          console.log(`    removido: ${legacyDest} (--migrate)`);
+        }
+      }
+    }
   }
 }
 
@@ -130,7 +156,7 @@ function deriveProjectName(specsDir) {
 function cmdGenerate(flags) {
   const specsDir = findSpecsDir(flags.specs);
   const project = flags.project || deriveProjectName(specsDir);
-  const out = path.resolve(flags.out || 'speckit-graph.html');
+  const out = path.resolve(flags.out || 'sdd-graph.html');
   const selfContained = !flags.cdn;
   const src = flags.src ? path.resolve(flags.src) : null; // escopo do código p/ arquitetura (monorepo)
 
@@ -172,6 +198,8 @@ function cmdGenerate(flags) {
   if (diffLabel) console.log(`  Diff sobreposto vs. base: ${diffLabel}`);
   if (timeline) console.log(`  Timeline embutida: ${timeline.points.length} pontos`);
   console.log(`  Modo: ${selfContained ? 'self-contained (offline)' : 'CDN'}`);
+  if (!flags.out && fs.existsSync(path.resolve('speckit-graph.html')))
+    console.log('  ℹ️  Encontrado speckit-graph.html (nome antigo) aqui — o padrão agora é sdd-graph.html; pode apagar o antigo.');
   if (flags.open) { openFile(out); console.log('  Abrindo no navegador…'); }
 }
 
@@ -237,8 +265,8 @@ function cmdCheck(flags) {
   const { report, passed, fingerprints } = buildGateReport(data, { gate, baseline });
 
   if (flags['update-baseline']) {
-    const bp = baselinePath || path.resolve('speckit-graph.baseline.json');
-    fs.writeFileSync(bp, stringifyCanonical({ tool: 'speckit-graph', schemaVersion: 1, fingerprints: [...fingerprints].sort() }));
+    const bp = baselinePath || path.resolve('sdd-graph.baseline.json');
+    fs.writeFileSync(bp, stringifyCanonical({ tool: 'sdd-graph', schemaVersion: 1, fingerprints: [...fingerprints].sort() }));
     console.error(`✓ baseline atualizado: ${bp} (${fingerprints.size} findings)`);
     process.exit(0);
   }
@@ -271,7 +299,7 @@ function cmdSnapshot(args) {
   const specsDir = findSpecsDir(flags.specs);
   const src = flags.src ? path.resolve(flags.src) : null;
   const data = parseProject({ specsDir, src, adapter: flags.adapter });
-  const dest = path.resolve(args._[1] || flags.out || 'speckit-graph.snapshot.json');
+  const dest = path.resolve(args._[1] || flags.out || 'sdd-graph.snapshot.json');
   fs.writeFileSync(dest, stringifyCanonical(buildSnapshot(data)));
   const n = Object.keys(data).length;
   console.error(`✓ snapshot gravado: ${dest} (${n} spec(s))`);
@@ -326,7 +354,7 @@ function resolveBaseSnapshot(fromArg, specsDir, src) {
     try { j = JSON.parse(fs.readFileSync(asFile, 'utf8')); }
     catch { console.error(`✗ não consegui ler o snapshot: ${asFile}`); process.exit(2); }
     if (j && j.kind === 'snapshot' && j.specs) return j;
-    console.error('✗ arquivo não é um snapshot do speckit-graph (gere com `speckit-graph snapshot`).');
+    console.error('✗ arquivo não é um snapshot do sdd-graph (gere com `sdd-graph snapshot`).');
     process.exit(2);
   }
   try { return snapshotFromGitRef(fromArg, specsDir, src); }
@@ -340,8 +368,8 @@ function cmdDiff(args) {
   const fromArg = (typeof flags.from === 'string' && flags.from) || args._[1];
   if (!fromArg) {
     console.error('✗ diff: informe a base com --from <snapshot.json | git-ref>');
-    console.error('  ex.: speckit-graph diff --from HEAD~1     (compara com o commit anterior)');
-    console.error('       speckit-graph diff --from base.json  (compara com um snapshot salvo)');
+    console.error('  ex.: sdd-graph diff --from HEAD~1     (compara com o commit anterior)');
+    console.error('       sdd-graph diff --from base.json  (compara com um snapshot salvo)');
     process.exit(2);
   }
   const to = buildSnapshot(parseProject({ specsDir, src, adapter: flags.adapter }));
@@ -392,6 +420,9 @@ function cmdTimeline(args) {
 }
 
 function main() {
+  // aviso de deprecação: binário instalado sob o nome antigo (mesmo script, mesmo comportamento)
+  if (path.basename(process.argv[1] || '') === 'speckit-graph')
+    console.error('⚠️  "speckit-graph" foi renomeado para "sdd-graph" (mesmo binário). Atualize seus scripts quando puder.');
   const args = parseArgs(process.argv.slice(2));
   const sub = args._[0];
   try {
@@ -404,14 +435,14 @@ function main() {
     if (sub === 'timeline') return cmdTimeline(args);
     if (sub === 'watch') return cmdWatch(args);
     if (sub === 'help' || args.flags.help) {
-      console.log(`speckit-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
+      console.log(`sdd-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
 
-  speckit-graph [opções]        gera o HTML (3 abas)
+  sdd-graph [opções]        gera o HTML (3 abas)
     --specs <dir>   diretório de specs (default: ./specs autodetectado)
     --src <dir>     pasta de código p/ a aba Arquitetura (default: <raiz>/src)
                     use em monorepo p/ escopar só à feature (ex.: src/modulos/pedidos/consulta)
     --adapter <n>   força o adapter SDD (default: autodetecta). Hoje: speckit
-    --out <arquivo> saída (default: ./speckit-graph.html)
+    --out <arquivo> saída (default: ./sdd-graph.html)
     --project <nome> nome exibido no cabeçalho
     --cdn           usa D3 via CDN em vez de embutir (arquivo menor, precisa de internet)
     --open          abre o HTML no navegador ao terminar
@@ -421,14 +452,14 @@ function main() {
     --timeline [N]  embute a evolução dos últimos N commits (default 8) num painel
                     visual (📈 timeline): gráfico de progresso + tabela por ponto
 
-  speckit-graph watch [opções de generate]
+  sdd-graph watch [opções de generate]
     regera a base (+ --diff, se passado) a cada mudança nos specs/src;
     --timeline é ignorado (caro por save — rode sob demanda). Ctrl+C para parar.
 
-  speckit-graph doctor [--specs <dir>] [--src <dir>] [--strict]
+  sdd-graph doctor [--specs <dir>] [--src <dir>] [--strict]
     diagnóstico determinístico do plano; --strict sai com código ≠0 se houver erro
 
-  speckit-graph check [opções]   gate de CI: JSON canônico + exit code
+  sdd-graph check [opções]   gate de CI: JSON canônico + exit code
     --json <arquivo>   grava o relatório JSON (default: stdout)
     --format md        emite Markdown p/ comentário de PR (em vez de JSON)
     --base-url <url>   URL do HTML publicado (links "ver" no Markdown)
@@ -437,11 +468,11 @@ function main() {
     --update-baseline  (re)grava o baseline com os achados atuais e sai 0
     exit: 0 passou · 1 reprovou · 2 erro de execução
 
-  speckit-graph snapshot [arquivo] [--specs <dir>] [--src <dir>]
-    grava um snapshot do plano (default: ./speckit-graph.snapshot.json)
+  sdd-graph snapshot [arquivo] [--specs <dir>] [--src <dir>]
+    grava um snapshot do plano (default: ./sdd-graph.snapshot.json)
     versione-o para comparar a evolução depois com o comando diff
 
-  speckit-graph diff --from <snapshot.json | git-ref> [opções]
+  sdd-graph diff --from <snapshot.json | git-ref> [opções]
     compara a base (--from) com o plano atual: tasks novas/concluídas,
     mudanças de status/prioridade/deps e achados que surgiram/sumiram
     --from HEAD~1      compara com um commit (materializa os specs do ref)
@@ -449,17 +480,19 @@ function main() {
     --json [arquivo]   emite JSON canônico (default: Markdown no stdout)
     --out <arquivo>    grava a saída em arquivo
 
-  speckit-graph timeline [opções]   evolução do plano ao longo de N pontos
+  sdd-graph timeline [opções]   evolução do plano ao longo de N pontos
     --last <N>         últimos N commits que tocaram os specs (default: 5)
     --refs <a,b,c>     pontos explícitos (refs git) em vez de --last
     --no-current       não inclui o estado atual (working tree) como último ponto
     --json [arquivo]   JSON canônico (default: Markdown: tabela + sparkline)
     --out <arquivo>    grava a saída em arquivo
 
-  speckit-graph init [--global] [--target <lista>]
-    instala o comando /speckit-graph nas ferramentas de IA
+  sdd-graph init [--global] [--target <lista>]
+    instala o comando /sdd-graph nas ferramentas de IA
     --target  claude,copilot,copilot-cli,kiro (default) | copilot-cli-agent (opcional)
     --global  instala no diretório do usuário (claude, kiro; copilot e copilot-cli são por-projeto)
+    --keep-legacy  também instala com o nome antigo /speckit-graph (transição)
+    --migrate      remove os arquivos /speckit-graph instalados (nome antigo)
 `);
       return;
     }

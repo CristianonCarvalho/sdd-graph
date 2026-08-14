@@ -1,4 +1,4 @@
-// speckit-graph — monta o HTML final injetando dados, D3 e nome do projeto.
+// sdd-graph — monta o HTML final injetando dados, D3 e nome do projeto.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

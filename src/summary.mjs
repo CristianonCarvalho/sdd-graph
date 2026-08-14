@@ -1,4 +1,4 @@
-// speckit-graph — resumo textual (Markdown) determinístico do plano.
+// sdd-graph — resumo textual (Markdown) determinístico do plano.
 // Para colar em PR / issue / ata sem abrir o HTML. Puro, sem I/O.
 
 function graphInfo(tasks) {
@@ -36,7 +36,7 @@ function graphInfo(tasks) {
 }
 
 export function buildSummary(data, project) {
-  const L = [`# speckit-graph — ${project}`, ''];
+  const L = [`# sdd-graph — ${project}`, ''];
   for (const slug of Object.keys(data).sort()) {
     const d = data[slug];
     const tasks = d.tasks || [];

@@ -1,6 +1,8 @@
-# speckit-graph
+# sdd-graph
 
-Diagramas interativos dos artefatos do [SpecKit](https://github.com/github/spec-kit).
+**SDD-Graph** (antes `speckit-graph`) — diagramas interativos de projetos *Spec-Driven
+Development*. Hoje lê o [SpecKit](https://github.com/github/spec-kit); BMad e Reversa
+estão no roadmap (ver [`docs/plano-sdd-graph.md`](docs/plano-sdd-graph.md)).
 Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
 ![Animação da aba de Dependências: o grafo em camadas revela as tasks coluna a coluna, com caminho crítico, formas por prioridade e painel de progresso](docs/img/demo.gif)
@@ -41,19 +43,20 @@ Zero dependências de runtime (Node ≥ 18). D3 embutido no HTML.
 
 ```bash
 # a partir da raiz de um projeto SpecKit (que tenha specs/*/tasks.md)
-npx --yes github:CristianonCarvalho/speckit-graph --open
+npx --yes github:CristianonCarvalho/sdd-graph --open
 ```
 
-Isso gera `speckit-graph.html` na raiz do projeto e abre no navegador.
+Isso gera `sdd-graph.html` na raiz do projeto e abre no navegador.
 
 ### Opções
 
 ```
-speckit-graph [opções]
+sdd-graph [opções]
   --specs <dir>     diretório de specs (default: ./specs autodetectado)
   --src <dir>       pasta de código p/ a aba Arquitetura (default: <raiz>/src);
                     em monorepo, aponte só à feature (ex.: src/modulos/pedidos/consulta)
-  --out <arquivo>   saída (default: ./speckit-graph.html)
+  --adapter <nome>  força o adapter SDD (default: autodetecta). Hoje: speckit
+  --out <arquivo>   saída (default: ./sdd-graph.html)
   --project <nome>  nome exibido no cabeçalho
   --cdn             usa D3 via CDN (arquivo menor, precisa de internet)
   --open            abre o HTML no navegador ao terminar
@@ -65,8 +68,8 @@ O HTML é um **snapshot estático**: reflete os specs/código/git do momento em 
 ### Atualizar automaticamente (watch)
 
 ```bash
-speckit-graph watch --src ./src --open       # regera a cada save; abre uma vez
-speckit-graph watch --src ./src --diff HEAD~1  # inclui a sobreposição de diff (é barato)
+sdd-graph watch --src ./src --open       # regera a cada save; abre uma vez
+sdd-graph watch --src ./src --diff HEAD~1  # inclui a sobreposição de diff (é barato)
 ```
 
 Observa `specs/` (e `--src`, se dado) e **regera a base a cada mudança** (debounce de 200 ms) — aí é só dar F5 na aba. O `--timeline` é **ignorado** no watch de propósito (materializa N versões do git, caro a cada save); rode-o sob demanda. `Ctrl+C` para parar. Usa `fs.watch` recursivo (macOS/Windows; em Linux cai para não-recursivo no topo das pastas).
@@ -76,9 +79,9 @@ Observa `specs/` (e `--src`, se dado) e **regera a base a cada mudança** (debou
 Um "linter" do plano SpecKit: roda sobre o que já é lido e aponta problemas de planejamento, de forma reproduzível (mesmo input → mesma saída), sem rede nem escrita.
 
 ```bash
-speckit-graph doctor            # relatório humano
-speckit-graph doctor --strict   # sai com código ≠0 se houver erro (para CI)
-speckit-graph --doctor          # mesmo relatório junto do fluxo normal
+sdd-graph doctor            # relatório humano
+sdd-graph doctor --strict   # sai com código ≠0 se houver erro (para CI)
+sdd-graph --doctor          # mesmo relatório junto do fluxo normal
 ```
 
 Regras (id · severidade):
@@ -107,9 +110,9 @@ Ex.: um monorepo sem `--src` cai a ~81% (arquitetura heurística); com `--src` n
 Embrulha o Doctor para o pipeline: relatório **JSON canônico** (determinístico) e **exit code** para reprovar o merge quando o plano tem problemas.
 
 ```bash
-speckit-graph check                       # JSON no stdout; exit 1 se houver erro
-speckit-graph check --json report.json    # grava o JSON
-speckit-graph check --gate error,warn     # também reprova em avisos
+sdd-graph check                       # JSON no stdout; exit 1 se houver erro
+sdd-graph check --json report.json    # grava o JSON
+sdd-graph check --gate error,warn     # também reprova em avisos
 ```
 
 Exit: `0` passou · `1` reprovou · `2` erro de execução.
@@ -117,8 +120,8 @@ Exit: `0` passou · `1` reprovou · `2` erro de execução.
 ### Export & resumo
 
 ```bash
-speckit-graph summary               # resumo Markdown no stdout (p/ PR/issue/ata)
-speckit-graph --summary resumo.md   # grava em arquivo
+sdd-graph summary               # resumo Markdown no stdout (p/ PR/issue/ata)
+sdd-graph --summary resumo.md   # grava em arquivo
 ```
 
 O resumo (determinístico) traz progresso, caminho crítico, gargalos, próximas tasks desbloqueáveis, achados do Doctor e o índice de confiança. No HTML, os botões **⬇ PNG** e **⬇ SVG** exportam a visão atual (respeitando aba, filtros, zoom e tema) — serialização nativa, sem libs.
@@ -126,20 +129,20 @@ O resumo (determinístico) traz progresso, caminho crítico, gargalos, próximas
 **Adoção gradual (baseline)** — para um plano legado que já tem problemas, aceite o estado atual e passe a reprovar só no que for **novo**:
 
 ```bash
-speckit-graph check --baseline sg.baseline.json --update-baseline   # aceita o legado
-git add sg.baseline.json                                            # versione
-speckit-graph check --baseline sg.baseline.json                     # reprova só regressões novas
+sdd-graph check --baseline sg.baseline.json --update-baseline   # aceita o legado
+git add sg.baseline.json                                        # versione
+sdd-graph check --baseline sg.baseline.json                     # reprova só regressões novas
 ```
 
-Cada achado tem um `fingerprint` estável (independe de ordem/posição). Workflow de exemplo do GitHub Actions em [`examples/github/speckit-graph.yml`](examples/github/speckit-graph.yml).
+Cada achado tem um `fingerprint` estável (independe de ordem/posição). Workflow de exemplo do GitHub Actions em [`examples/github/sdd-graph.yml`](examples/github/sdd-graph.yml).
 
 **Comentário de PR** — `check --format md` emite Markdown (tabela de achados com links para a visão exata) para postar como comentário fixo no PR:
 
 ```bash
-speckit-graph check --format md --base-url https://ci.exemplo/speckit-graph.html
+sdd-graph check --format md --base-url https://ci.exemplo/sdd-graph.html
 ```
 
-O Markdown traz um marcador `<!-- speckit-graph -->` para o comentário ser atualizado (não duplicado) a cada push.
+O Markdown traz um marcador `<!-- sdd-graph -->` para o comentário ser atualizado (não duplicado) a cada push.
 
 ## Diff / Timeline — o que mudou no plano
 
@@ -149,14 +152,14 @@ A base (`--from`) pode ser um **git ref** (comparação instantânea entre commi
 
 ```bash
 # vs. um commit — materializa os specs daquele ref via `git archive`
-speckit-graph diff --from HEAD~1
-speckit-graph diff --from v1.0 --src src/modulos/pedidos/consulta   # monorepo: escopa o código
+sdd-graph diff --from HEAD~1
+sdd-graph diff --from v1.0 --src src/modulos/pedidos/consulta   # monorepo: escopa o código
 
 # vs. um snapshot versionado (determinístico, sem git)
-speckit-graph snapshot base.json     # grava o estado atual
-git add base.json                    # versione junto do plano
+sdd-graph snapshot base.json     # grava o estado atual
+git add base.json                # versione junto do plano
 # … tempo depois …
-speckit-graph diff --from base.json  # o que mudou desde então
+sdd-graph diff --from base.json  # o que mudou desde então
 ```
 
 Saída em **Markdown** (stdout, bom para PR/issue/ata) ou **JSON canônico** com `--json [arquivo]`; `--out <arquivo>` grava em disco. Exemplo de saída:
@@ -174,16 +177,16 @@ O snapshot é um JSON pequeno (status/prioridade/deps/frs das tasks, achados por
 **Diff visual no HTML** — passe `--diff <base>` ao gerar o grafo para **sobrepor a evolução** na aba Dependências: cada nó ganha um marcador (🔵 nova · 🟢 concluída desde a base · 🟡 alterada) e um card lateral **"Diff do plano"** lista as mudanças (clicável para saltar ao nó). Toggle **🕒 diff** liga/desliga; o estado entra no permalink.
 
 ```bash
-speckit-graph --diff HEAD~1 --open        # o que mudou desde o commit anterior
-speckit-graph --diff base.json --open     # desde um snapshot salvo
+sdd-graph --diff HEAD~1 --open        # o que mudou desde o commit anterior
+sdd-graph --diff base.json --open     # desde um snapshot salvo
 ```
 
 **Timeline (N versões)** — acompanha a **evolução ao longo de vários commits**: progresso por ponto, concluídas/novas entre pontos, contagem de erros/avisos e uma tendência em sparkline. Determinístico (as datas vêm do git, não do relógio).
 
 ```bash
-speckit-graph timeline --last 8       # últimos 8 commits que tocaram os specs + estado atual
-speckit-graph timeline --refs v1.0,v1.1,HEAD
-speckit-graph timeline --json tl.json # JSON canônico em vez de Markdown
+sdd-graph timeline --last 8       # últimos 8 commits que tocaram os specs + estado atual
+sdd-graph timeline --refs v1.0,v1.1,HEAD
+sdd-graph timeline --json tl.json # JSON canônico em vez de Markdown
 ```
 
 ```
@@ -196,31 +199,35 @@ No período: 6 concluída(s) · 2 nova(s) · 0 removida(s) · achados +1 / −3
 **Timeline visual no HTML** — passe `--timeline [N]` ao gerar para embutir a evolução (últimos N commits, default 8) num painel: botão **📈 timeline** abre um **gráfico de progresso** (área + linha, com % por ponto) e a **tabela** (progresso, concluídas, novas, erros/avisos por ponto).
 
 ```bash
-speckit-graph --timeline --open        # últimos 8 commits + estado atual
-speckit-graph --timeline 12 --open
+sdd-graph --timeline --open        # últimos 8 commits + estado atual
+sdd-graph --timeline 12 --open
 ```
 
-## Comando /speckit-graph (Claude Code, GitHub Copilot e Kiro)
+## Comando /sdd-graph (Claude Code, GitHub Copilot e Kiro)
 
-Instale o comando `/speckit-graph` nas três ferramentas de IA de uma vez:
+Instale o comando `/sdd-graph` nas três ferramentas de IA de uma vez:
 
 ```bash
-npx --yes github:CristianonCarvalho/speckit-graph init
+npx --yes github:CristianonCarvalho/sdd-graph init
 ```
 
 Isso instala, no projeto atual:
 
 | Ferramenta | Arquivo instalado | Como invocar |
 |---|---|---|
-| **Claude Code** | `.claude/commands/speckit-graph.md` | `/speckit-graph` |
-| **GitHub Copilot** (VS Code/JetBrains) | `.github/prompts/speckit-graph.prompt.md` | `/speckit-graph` |
-| **GitHub Copilot CLI** | `.github/extensions/speckit-graph/extension.mjs` | `/speckit-graph` (direto) |
-| **Kiro** | `.kiro/steering/speckit-graph.md` | `/speckit-graph` |
+| **Claude Code** | `.claude/commands/sdd-graph.md` | `/sdd-graph` |
+| **GitHub Copilot** (VS Code/JetBrains) | `.github/prompts/sdd-graph.prompt.md` | `/sdd-graph` |
+| **GitHub Copilot CLI** | `.github/extensions/sdd-graph/extension.mjs` | `/sdd-graph` (direto) |
+| **Kiro** | `.kiro/steering/sdd-graph.md` | `/sdd-graph` |
+
+> **Atualizando de uma instalação antiga (`/speckit-graph`)?** `init --migrate` remove os
+> arquivos com o nome antigo; `init --keep-legacy` mantém os dois nomes instalados durante
+> a transição. O binário `speckit-graph` continua funcionando como alias de `sdd-graph`.
 
 > **Copilot CLI:** o CLI não reconhece slash commands de `.github/prompts/`
-> ([issue #618](https://github.com/github/copilot-cli/issues/618)). Para ter `/speckit-graph`
+> ([issue #618](https://github.com/github/copilot-cli/issues/618)). Para ter `/sdd-graph`
 > **direto** (sem `/agent`), este projeto instala uma **extensão do Copilot CLI**
-> (`.github/extensions/speckit-graph/extension.mjs`) que registra o slash command via
+> (`.github/extensions/sdd-graph/extension.mjs`) que registra o slash command via
 > `@github/copilot-sdk`. Requer o CLI instalado (`npm install -g @github/copilot`); rode
 > `/extensions reload` se editar a extensão numa sessão aberta. As extensões são por-projeto.
 >
@@ -230,19 +237,19 @@ Isso instala, no projeto atual:
 Opções:
 
 ```bash
-npx --yes github:CristianonCarvalho/speckit-graph init --target kiro          # só uma
-npx --yes github:CristianonCarvalho/speckit-graph init --target claude,kiro   # algumas
-npx --yes github:CristianonCarvalho/speckit-graph init --target copilot-cli --global  # agente global do Copilot CLI
-npx --yes github:CristianonCarvalho/speckit-graph init --global               # ~/.claude, ~/.kiro, ~/.copilot/agents
+npx --yes github:CristianonCarvalho/sdd-graph init --target kiro          # só uma
+npx --yes github:CristianonCarvalho/sdd-graph init --target claude,kiro   # algumas
+npx --yes github:CristianonCarvalho/sdd-graph init --target copilot-cli --global  # agente global do Copilot CLI
+npx --yes github:CristianonCarvalho/sdd-graph init --global               # ~/.claude, ~/.kiro, ~/.copilot/agents
 ```
 
 ## Desenvolvimento local
 
 ```bash
-git clone <repo> && cd speckit-graph
-npm link                       # disponibiliza o binário `speckit-graph`
+git clone <repo> && cd sdd-graph
+npm link                       # disponibiliza o binário `sdd-graph` (+ alias `speckit-graph`)
 # ou aponte o comando para o checkout:
-export SPECKIT_GRAPH_HOME=/caminho/para/speckit-graph
+export SDD_GRAPH_HOME=/caminho/para/sdd-graph
 ```
 
 ## Testes
@@ -253,9 +260,11 @@ Suíte com o runner nativo do Node (`node:test`, zero dependências):
 npm test          # ou: node --test test/*.test.mjs
 ```
 
-Cobre o núcleo determinístico — parser (incl. imports relativos), Doctor (regras + ordenação), CI Gate (baseline, fingerprint, JSON canônico), índice de confiança e resumo. Rodam em CI (Node 18/20/22) via [`.github/workflows/test.yml`](.github/workflows/test.yml).
+Cobre o núcleo determinístico — parser (incl. imports relativos), Doctor (regras + ordenação), CI Gate (baseline, fingerprint, JSON canônico), índice de confiança, resumo e a camada de adapters SDD. Rodam em CI (Node 18/20/22) via [`.github/workflows/test.yml`](.github/workflows/test.yml).
 
 ## Como o parser entende o SpecKit
+
+Via o adapter SpecKit (`src/adapters/speckit.mjs`) — outros adapters no roadmap, ver [`docs/plano-sdd-graph.md`](docs/plano-sdd-graph.md).
 
 - Fases (`## Phase N: ...`) definem a user story e a prioridade (`Priority: P1`).
 - Fases sem story viram `SETUP` / `FOUND` (Foundational) / `POLISH`.
@@ -267,4 +276,4 @@ Nunca escreve nos arquivos de spec — apenas lê.
 
 ## Changelog
 
-Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.7.0**.
+Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.8.0**.

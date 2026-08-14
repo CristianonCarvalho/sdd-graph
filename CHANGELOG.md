@@ -4,6 +4,32 @@ Todas as mudanças relevantes deste projeto. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.8.0] — 2026-08-14
+
+**Renomeado: `speckit-graph` → `sdd-graph` (SDD-Graph).** O projeto deixa de ser
+acoplado só ao SpecKit — passa a se chamar pela metodologia (*Spec-Driven
+Development*), preparando terreno para outros adapters (BMad, Reversa — ver
+[`docs/plano-sdd-graph.md`](docs/plano-sdd-graph.md)).
+
+### Fundação (Fase 0)
+- **Modelo canônico + registry de adapters** (`src/adapters/`): o parser do SpecKit foi
+  encapsulado em `adapters/speckit.mjs`; `parseProject()` resolve o adapter aplicável
+  (`--adapter`, autodetecção). Sem mudança de comportamento — só reempacotamento.
+
+### Rename
+- Pacote `sdd-graph` (bin `sdd-graph`, com **alias `speckit-graph`** — mesmo binário,
+  aviso de deprecação ao ser invocado pelo nome antigo).
+- Comando `/sdd-graph` em Claude Code, Copilot (VS Code + CLI) e Kiro; `init --keep-legacy`
+  instala também o nome antigo durante a transição, `init --migrate` remove os arquivos
+  antigos.
+- Saída padrão passa a ser `sdd-graph.html` (com aviso se achar um `speckit-graph.html`
+  antigo no diretório); título do HTML "Mapa SDD".
+- `tool:` nos relatórios (`check`/`diff`/`snapshot`/`timeline`) e o marcador de
+  comentário de PR passam a `sdd-graph`.
+- Prefixo CSS `--sg-` **preservado** (agora lido como *SDD-Graph*); fingerprints e diffs
+  independem do nome — baselines existentes continuam válidos.
+- Repositório GitHub renomeado (`CristianonCarvalho/sdd-graph`); o nome antigo redireciona.
+
 ## [0.7.0] — 2026-08-14
 
 Fecha a linha **Timeline** e amplia a cobertura de **arquitetura** e **legibilidade**.
@@ -82,5 +108,6 @@ dependências de runtime, HTML self-contained.
 - Comando **`/speckit-graph`** instalável em Claude Code, GitHub Copilot (VS Code e CLI)
   e Kiro via `init`.
 
-[0.7.0]: https://github.com/CristianonCarvalho/speckit-graph/releases/tag/v0.7.0
-[0.6.0]: https://github.com/CristianonCarvalho/speckit-graph/releases/tag/v0.6.0
+[0.8.0]: https://github.com/CristianonCarvalho/sdd-graph/releases/tag/v0.8.0
+[0.7.0]: https://github.com/CristianonCarvalho/sdd-graph/releases/tag/v0.7.0
+[0.6.0]: https://github.com/CristianonCarvalho/sdd-graph/releases/tag/v0.6.0

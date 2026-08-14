@@ -1,6 +1,6 @@
-# Exemplo de workflow: roda o gate do speckit-graph em cada PR.
+# Exemplo de workflow: roda o gate do sdd-graph em cada PR.
 # Copie para .github/workflows/ no seu projeto SpecKit.
-name: speckit-graph gate
+name: sdd-graph gate
 on:
   pull_request:
   push:
@@ -22,34 +22,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          npx --yes github:CristianonCarvalho/speckit-graph check --format md > comment.md || true
+          npx --yes github:CristianonCarvalho/sdd-graph check --format md > comment.md || true
           gh pr comment "${{ github.event.number }}" --body-file comment.md --edit-last --create-if-none
 
       # Reprova o merge se o plano tiver ciclos, deps quebradas, ids duplicados etc.
-      # Troque SEU_USUARIO pelo dono do repositório do speckit-graph.
+      # Troque SEU_USUARIO pelo dono do repositório do sdd-graph.
       - name: Doctor gate
-        run: npx --yes github:CristianonCarvalho/speckit-graph check --json speckit-graph.report.json
+        run: npx --yes github:CristianonCarvalho/sdd-graph check --json sdd-graph.report.json
 
       # (opcional) publica o relatório JSON como artefato do build
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: speckit-graph-report
-          path: speckit-graph.report.json
+          name: sdd-graph-report
+          path: sdd-graph.report.json
 
       # (opcional) gera e publica o HTML self-contained para inspeção visual
       - name: Gera HTML
         if: always()
-        run: npx --yes github:CristianonCarvalho/speckit-graph --out speckit-graph.html
+        run: npx --yes github:CristianonCarvalho/sdd-graph --out sdd-graph.html
       - name: Upload HTML
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: speckit-graph-html
-          path: speckit-graph.html
+          name: sdd-graph-html
+          path: sdd-graph.html
 
 # Adoção gradual em um plano legado com problemas existentes:
-#   1) rode uma vez:  npx ... check --baseline speckit-graph.baseline.json --update-baseline
+#   1) rode uma vez:  npx ... check --baseline sdd-graph.baseline.json --update-baseline
 #   2) commite o baseline; o gate passa a reprovar SÓ em problemas NOVOS:
-#      npx ... check --baseline speckit-graph.baseline.json
+#      npx ... check --baseline sdd-graph.baseline.json

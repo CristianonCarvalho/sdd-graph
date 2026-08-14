@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mapa do SpecKit <!--__PROJECT__--></title>
+<title>Mapa SDD <!--__PROJECT__--></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <!--__D3__-->
@@ -188,7 +188,7 @@
 <div class="app">
   <header class="top">
     <div>
-      <h1>Mapa do SpecKit <span class="dot">·</span> <span id="hproj"></span> <span class="conf" id="confBadge"></span></h1>
+      <h1>Mapa SDD <span class="dot">·</span> <span id="hproj"></span> <span class="conf" id="confBadge"></span></h1>
       <div class="sub" id="tabsub">Dependências entre tasks</div>
     </div>
     <div class="tabs" id="tabs"></div>
@@ -885,11 +885,11 @@ function serializeSVG(){
   return {data:'<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(clone), w, h};
 }
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
-document.getElementById('svgBtn').onclick=()=>{ const {data}=serializeSVG(); dl(new Blob([data],{type:'image/svg+xml'}),`speckit-graph-${state.spec}-${state.tab}.svg`); };
+document.getElementById('svgBtn').onclick=()=>{ const {data}=serializeSVG(); dl(new Blob([data],{type:'image/svg+xml'}),`sdd-graph-${state.spec}-${state.tab}.svg`); };
 document.getElementById('pngBtn').onclick=()=>{ const {data,w,h}=serializeSVG(); const img=new Image(); const sc=2;
-  img.onload=()=>{ const c=document.createElement('canvas'); c.width=w*sc; c.height=h*sc; const ctx=c.getContext('2d'); ctx.scale(sc,sc); ctx.drawImage(img,0,0); c.toBlob(b=>b&&dl(b,`speckit-graph-${state.spec}-${state.tab}.png`)); };
+  img.onload=()=>{ const c=document.createElement('canvas'); c.width=w*sc; c.height=h*sc; const ctx=c.getContext('2d'); ctx.scale(sc,sc); ctx.drawImage(img,0,0); c.toBlob(b=>b&&dl(b,`sdd-graph-${state.spec}-${state.tab}.png`)); };
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(data); };
-document.getElementById('hproj').textContent=document.title.replace('Mapa do SpecKit','').trim()||'projeto';
+document.getElementById('hproj').textContent=document.title.replace('Mapa SDD','').trim()||'projeto';
 window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(fit,200);});
 window.addEventListener('hashchange',()=>{ const s=readHash(); syncUIToState(); render(true); if(s){const n=G._byId.get(s);if(n){showDetail(n);hover(n);setTimeout(()=>centerNode(s),650);}} });
 

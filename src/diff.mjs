@@ -1,4 +1,4 @@
-// speckit-graph — Diff/Timeline: compara duas versões do plano (base → atual).
+// sdd-graph — Diff/Timeline: compara duas versões do plano (base → atual).
 // Puro e determinístico: mesmas entradas => mesmos bytes. Sem I/O, sem relógio.
 // O CLI cuida de ler snapshots salvos ou materializar um git ref.
 import { fingerprint } from './gate.mjs';
@@ -36,7 +36,7 @@ export function buildSnapshot(data) {
       findings,
     };
   }
-  return { tool: 'speckit-graph', schemaVersion: 1, kind: 'snapshot', specs };
+  return { tool: 'sdd-graph', schemaVersion: 1, kind: 'snapshot', specs };
 }
 
 function sortFindings(list) {
@@ -98,7 +98,7 @@ export function diffReport(from, to) {
     totals.statusChanged += statusChanged.length; totals.completed += completed.length;
     totals.findingsAppeared += appeared.length; totals.findingsResolved += resolved.length;
   }
-  return { tool: 'speckit-graph', schemaVersion: 1, kind: 'diff', totals, specsAdded, specsRemoved, specs };
+  return { tool: 'sdd-graph', schemaVersion: 1, kind: 'diff', totals, specsAdded, specsRemoved, specs };
 }
 
 const pct = (d, t) => t ? Math.round(d / t * 100) : 0;
@@ -107,7 +107,7 @@ const pct = (d, t) => t ? Math.round(d / t * 100) : 0;
 export function diffMarkdown(rep, opts = {}) {
   const proj = opts.project ? ` — ${opts.project}` : '';
   const t = rep.totals;
-  const L = ['### 🕒 speckit-graph — diff do plano' + proj,
+  const L = ['### 🕒 sdd-graph — diff do plano' + proj,
     `**${t.completed} concluída(s)** desde a base · ${t.tasksAdded} nova(s) · ${t.tasksRemoved} removida(s) · achados: +${t.findingsAppeared} / −${t.findingsResolved}`, ''];
   const anyChange = Object.keys(rep.specs).some(s => rep.specs[s].status !== 'unchanged');
   if (!anyChange) { L.push('_Sem mudanças em relação à base._'); return L.join('\n'); }
@@ -132,6 +132,6 @@ export function diffMarkdown(rep, opts = {}) {
     if (s.findings.resolved.length) L.push(`✔️ Achados resolvidos: ${s.findings.resolved.map(f => `[${f.id}] ${f.targetId}`).join(', ')}`);
     L.push('');
   }
-  L.push('<sub>gerado por speckit-graph — determinístico</sub>');
+  L.push('<sub>gerado por sdd-graph — determinístico</sub>');
   return L.join('\n');
 }

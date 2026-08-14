@@ -44,6 +44,6 @@ test('stringifyCanonical é determinístico (chaves ordenadas)', () => {
 
 test('gateMarkdown: marcador e link via permalink', () => {
   const md = gateMarkdown(buildGateReport(data).report, { baseUrl: 'https://x/g.html' });
-  assert.ok(md.includes('<!-- speckit-graph -->'));
+  assert.ok(md.includes('<!-- sdd-graph -->'));
   assert.match(md, /#tab=deps&sel=T\d+/);
 });

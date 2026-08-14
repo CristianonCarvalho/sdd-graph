@@ -1,7 +1,7 @@
-// speckit-graph — extensão do GitHub Copilot CLI
-// Registra o slash command /speckit-graph DIRETO (sem /agent).
-// Instale em .github/extensions/speckit-graph/extension.mjs — o CLI carrega
-// automaticamente e /speckit-graph fica disponível (use /extensions reload
+// sdd-graph — extensão do GitHub Copilot CLI
+// Registra o slash command /sdd-graph DIRETO (sem /agent).
+// Instale em .github/extensions/sdd-graph/extension.mjs — o CLI carrega
+// automaticamente e /sdd-graph fica disponível (use /extensions reload
 // após editar). O @github/copilot-sdk é fornecido pelo runtime do CLI.
 import { joinSession } from "@github/copilot-sdk";
 import { execFile } from "node:child_process";
@@ -16,14 +16,16 @@ function findSpecsDir(cwd) {
 }
 
 // Ordem de preferência (gera DIRETO, sem baixar):
-//   1) SPECKIT_GRAPH_HOME (clone local)  2) binário instalado (global/npm link)
+//   1) SDD_GRAPH_HOME (clone local)  2) binário instalado (global/npm link)
 //   3) npx github (último recurso — baixa do GitHub a cada vez)
+// speckit-graph (nome antigo) fica como fallback p/ quem ainda não atualizou.
 function candidates() {
-  const home = process.env.SPECKIT_GRAPH_HOME;
+  const home = process.env.SDD_GRAPH_HOME || process.env.SPECKIT_GRAPH_HOME;
   const list = [];
   if (home) list.push(["node", [path.join(home, "bin", "cli.mjs"), "--open"]]);
-  list.push(["speckit-graph", ["--open"]]);
-  list.push(["npx", ["--yes", "github:CristianonCarvalho/speckit-graph", "--open"]]);
+  list.push(["sdd-graph", ["--open"]]);
+  list.push(["speckit-graph", ["--open"]]); // alias/versões antigas
+  list.push(["npx", ["--yes", "github:CristianonCarvalho/sdd-graph", "--open"]]);
   return list;
 }
 
@@ -53,7 +55,7 @@ await joinSession({
   onPermissionRequest: () => ({ permissionDecision: "allow" }),
   slashCommands: [
     {
-      name: "speckit-graph",
+      name: "sdd-graph",
       description:
         "Gera e abre o grafo interativo de dependências/prioridades das tasks do SpecKit.",
       action: async (session) => {
@@ -61,7 +63,7 @@ await joinSession({
         if (!findSpecsDir(cwd)) {
           await session.send({
             prompt:
-              "O /speckit-graph não encontrou specs/*/tasks.md aqui. Avise o usuário, em uma linha, que ele precisa rodar o comando na raiz de um projeto SpecKit.",
+              "O /sdd-graph não encontrou specs/*/tasks.md aqui. Avise o usuário, em uma linha, que ele precisa rodar o comando na raiz de um projeto SpecKit.",
           });
           return;
         }

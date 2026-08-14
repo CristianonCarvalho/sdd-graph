@@ -1,4 +1,4 @@
-// speckit-graph — parser de tasks.md do SpecKit para grafo (nós + arestas).
+// sdd-graph — parser de tasks.md do SpecKit para grafo (nós + arestas).
 // Genérico: descobre todos os specs/*/tasks.md do projeto onde roda.
 import fs from 'node:fs';
 import path from 'node:path';

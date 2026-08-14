@@ -1,9 +1,10 @@
 {
-  "name": "speckit-graph",
-  "version": "0.7.0",
-  "description": "Diagramas interativos do SpecKit: dependências de tasks, casos de uso e arquitetura, num HTML self-contained.",
+  "name": "sdd-graph",
+  "version": "0.8.0",
+  "description": "Diagramas interativos de projetos Spec-Driven Development: dependências de tasks, casos de uso e arquitetura, num HTML self-contained. Hoje lê o SpecKit; outros adapters no roadmap.",
   "type": "module",
   "bin": {
+    "sdd-graph": "bin/cli.mjs",
     "speckit-graph": "bin/cli.mjs"
   },
   "files": [
@@ -24,6 +25,6 @@
   "author": "Cristiano Carvalho",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CristianonCarvalho/speckit-graph.git"
+    "url": "git+https://github.com/CristianonCarvalho/sdd-graph.git"
   }
 }

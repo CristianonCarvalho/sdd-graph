@@ -1,4 +1,4 @@
-// speckit-graph — CI Gate: transforma o diagnóstico do Doctor em relatório JSON
+// sdd-graph — CI Gate: transforma o diagnóstico do Doctor em relatório JSON
 // determinístico + veredito (passou/falhou) para uso em pipeline.
 // Puro: sem I/O, sem relógio/rede. O CLI cuida de ler/gravar arquivos.
 
@@ -74,7 +74,7 @@ export function buildGateReport(data, opts = {}) {
   const passed = violations === 0;
   const report = {
     schemaVersion: 1,
-    tool: 'speckit-graph',
+    tool: 'sdd-graph',
     summary: agg,
     gate: {
       levels: gate,
@@ -102,7 +102,7 @@ function findingLink(f, baseUrl) {
 export function gateMarkdown(report, opts = {}) {
   const base = opts.baseUrl || '';
   const s = report.summary;
-  const L = ['<!-- speckit-graph -->', '### 🔎 speckit-graph — gate do plano',
+  const L = ['<!-- sdd-graph -->', '### 🔎 sdd-graph — gate do plano',
     `**${report.gate.passed ? '✅ passou' : '❌ reprovou'}** — ${s.error} erro(s), ${s.warn} aviso(s), ${s.info} info · confiança ${s.confidenceIndex != null ? s.confidenceIndex + '%' : '—'}`, ''];
   for (const slug of Object.keys(report.specs)) {
     const sp = report.specs[slug];
@@ -116,7 +116,7 @@ export function gateMarkdown(report, opts = {}) {
     } else L.push('_sem erros/avisos_ ✓');
     L.push('', `Grafo: ${sp.graph.nodes} tasks · ${sp.graph.edges} deps · caminho crítico ${sp.graph.criticalPathLength ?? '—'}`, '');
   }
-  L.push('<sub>gerado por speckit-graph — determinístico</sub>');
+  L.push('<sub>gerado por sdd-graph — determinístico</sub>');
   return L.join('\n');
 }
 
