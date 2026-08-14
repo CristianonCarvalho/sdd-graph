@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseTaskDeps, parseTasksFile, parseSpecs } from '../src/parse.mjs';
@@ -30,6 +32,25 @@ test('parseTasksFile: deps inválidas filtradas em deps mas preservadas em depsR
   const t3 = tasks.find(t => t.id === 'T003');
   assert.deepEqual(t3.deps, []);          // T999 removido
   assert.deepEqual(t3.depsRaw, ['T999']); // preservado p/ o Doctor
+});
+
+test('parseTasksFile: [~] marca task em andamento (nem done, nem aberta)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-'));
+  const f = path.join(dir, 'tasks.md');
+  fs.writeFileSync(f, [
+    '## Phase 1: Setup',
+    '- [X] T001 feita',
+    '- [~] T002 em andamento',
+    '- [ ] T003 aberta',
+  ].join('\n'));
+  const byId = Object.fromEntries(parseTasksFile(f).map(t => [t.id, t]));
+  assert.equal(byId.T001.done, true);
+  assert.equal(byId.T001.inProgress, false);
+  assert.equal(byId.T002.done, false);
+  assert.equal(byId.T002.inProgress, true);
+  assert.equal(byId.T003.done, false);
+  assert.equal(byId.T003.inProgress, false);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('parseSpecs: casos de uso, FRs e arquitetura lida do código (imports relativos)', () => {

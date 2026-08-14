@@ -72,6 +72,7 @@ export function parseTasksFile(file) {
         story: curStory,
         priority: curPriority,
         done: tm[1].toLowerCase() === 'x',
+        inProgress: tm[1] === '~',
         parallel,
         deps: parseTaskDeps(rest),
         frs: [...new Set(rest.match(/FR-\d+[a-z]?/g) || [])],

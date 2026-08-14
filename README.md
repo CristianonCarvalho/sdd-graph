@@ -3,11 +3,11 @@
 Diagramas interativos dos artefatos do [SpecKit](https://github.com/github/spec-kit).
 Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
-- **Dependências** — grafo dirigido em camadas das tasks: cor = prioridade (P1/P2/P3, Setup, Fundação, Polish), tamanho = quão bloqueante, **caminho crítico** animado. Barra de **progresso** (geral e por prioridade, lida dos checkboxes `- [x]`) e painel **"faça isto a seguir"** com as tasks já desbloqueadas (todas as dependências concluídas); concluídas ganham anel verde, prontas ganham anel âmbar.
+- **Dependências** — grafo dirigido em camadas das tasks: cor = prioridade (P1/P2/P3, Setup, Fundação, Polish), tamanho = quão bloqueante, **caminho crítico** animado. Barra de **progresso** (geral e por prioridade, lida dos checkboxes `- [x]`) e painel **"faça isto a seguir"** com as tasks já desbloqueadas (todas as dependências concluídas); concluídas ganham anel verde, prontas ganham anel âmbar. Botão **📋 standup** abre um painel com quatro colunas — concluídas · **em andamento** (`- [~]`) · prontas p/ começar · bloqueadas — feito para compartilhar na daily.
 - **Casos de uso** — ator → casos de uso (user stories do `spec.md`, cor por prioridade) → requisitos (FR) que cada um cobre.
 - **Arquitetura** — componentes e fluxo (Web UI → API → Serviços → integrações/modelos → sistemas externos e banco). Se houver código **Python ou Java** em `src/`, **lê os `import`s** (absolutos e **relativos** em Python, ex.: `from ..integrations.binance import ...`) e liga cada serviço ao adapter/modelo real (preciso); senão, deriva das pastas + `plan.md` (heurístico). O subtítulo indica qual dos dois. Nomes de camada variados são normalizados (EN + **PT-BR**: service/servico, controller/controle, repository/repositorio, gateway/integracao…). **Monorepo:** use `--src <pasta-da-feature>` para escopar a varredura, senão o pacote-base fica genérico demais e a arquitetura não é reconhecida.
 
-Comum às três: hover ilumina a cadeia, clique abre o detalhe (com **métricas**: quantas tasks dependem/desbloqueiam), tooltip no nó, filtro por prioridade, toggle entre specs, **minimapa** de orientação e **busca** com contador, ‹ › e auto-zoom ao resultado (Enter). **Permalink** (estado da visão no `#hash`, botão "🔗 link"). **Acessibilidade:** forma do nó por prioridade (duplo canal, não só cor), paleta segura para daltonismo (Okabe-Ito), tema claro + modo de impressão, e respeito a `prefers-reduced-motion`.
+Comum às três: hover ilumina a cadeia, clique abre o detalhe (com **métricas**: quantas tasks dependem/desbloqueiam) e botão **🎯 focar a cadeia**, que isola só os ancestrais e descendentes daquele nó (o resto some), com auto-zoom e um chip para sair. Toggle **⚠ diagnóstico** sobrepõe no grafo os achados do Doctor por severidade (ponto vermelho = erro, âmbar = aviso, azul = info) e abre um card lateral com a lista completa, clicável para saltar ao nó. Ainda: tooltip no nó, filtro por prioridade, toggle entre specs, **minimapa** de orientação e **busca** com contador, ‹ › e auto-zoom ao resultado (Enter). **Permalink** (estado da visão no `#hash` — inclui foco e diagnóstico —, botão "🔗 link"). **Acessibilidade:** forma do nó por prioridade (duplo canal, não só cor), paleta segura para daltonismo (Okabe-Ito), tema claro + modo de impressão, e respeito a `prefers-reduced-motion`.
 
 Fontes lidas (somente leitura, nunca escreve): `tasks.md` (dependências), `spec.md` (casos de uso e texto dos FRs), `plan.md` (stack), e — quando existir — `src/**/*.py` ou `src/**/*.java` (acoplamento real na aba Arquitetura).
 
@@ -165,7 +165,7 @@ Cobre o núcleo determinístico — parser (incl. imports relativos), Doctor (re
 
 - Fases (`## Phase N: ...`) definem a user story e a prioridade (`Priority: P1`).
 - Fases sem story viram `SETUP` / `FOUND` (Foundational) / `POLISH`.
-- Tasks: `- [ ] T001 [P] descrição...` → `[X]` = concluída, `[P]` = paralelizável.
+- Tasks: `- [ ] T001 [P] descrição...` → `[X]` = concluída, `[~]` = em andamento, `[P]` = paralelizável.
 - Dependências: qualquer `depende de T003`, ranges `T008–T013` e listas `T020, T031`.
 - Requisitos: qualquer `FR-XXX` citado na descrição.
 
