@@ -4,6 +4,34 @@ Todas as mudanças relevantes deste projeto. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.7.0] — 2026-08-14
+
+Fecha a linha **Timeline** e amplia a cobertura de **arquitetura** e **legibilidade**.
+
+### Timeline
+- **Timeline multi-versão** (comando `timeline`) — evolução do plano ao longo de N
+  pontos: `--last N` (commits que tocaram os specs) ou `--refs a,b,c`; progresso por
+  ponto, concluídas/novas entre pontos e contagem de erros/avisos. Markdown (tabela +
+  sparkline + acumulado) ou JSON canônico. Reusa `diffReport()` para os deltas.
+- **Timeline visual no HTML** (`--timeline [N]`) — embute a evolução e mostra num painel
+  📈: gráfico de progresso (área + linha em D3) + tabela por ponto.
+
+### Arquitetura multi-linguagem
+- Leitura de imports estendida a **TypeScript/JavaScript** (relativos + alias `@/`, `~/`,
+  `src/`; `import`/`export from`, `require`, `import()` dinâmico; externos ignorados) e
+  **Go** (imports sob o módulo do `go.mod`; `internal/`, `pkg/`, `cmd/` transparentes).
+  Antes: só Python e Java.
+- `walkFiles` passa a pular `node_modules`, `dist`, `build`, `out`, `target`, `vendor`, `.git`.
+
+### Legibilidade
+- **Layout Sugiyama** para grafos grandes (≥ 400 nós): nós fantasmas nas arestas que pulam
+  camadas, minimização de cruzamentos por mediana e alinhamento; arestas longas roteadas
+  pelas camadas. Abaixo do limite, o barycenter atual permanece (sem regressão). Custo
+  imperceptível (o layout roda 1× por render).
+
+### Infra
+- Suíte com **39 testes** (novos: TS/JS e Go, timeline). Determinismo preservado.
+
 ## [0.6.0] — 2026-08-14
 
 Consolida a linha **Diff/Timeline** e todo o trabalho das v0.2–v0.5 no primeiro
@@ -54,4 +82,5 @@ dependências de runtime, HTML self-contained.
 - Comando **`/speckit-graph`** instalável em Claude Code, GitHub Copilot (VS Code e CLI)
   e Kiro via `init`.
 
+[0.7.0]: https://github.com/CristianonCarvalho/speckit-graph/releases/tag/v0.7.0
 [0.6.0]: https://github.com/CristianonCarvalho/speckit-graph/releases/tag/v0.6.0

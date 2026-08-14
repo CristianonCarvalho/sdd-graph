@@ -232,4 +232,4 @@ Nunca escreve nos arquivos de spec — apenas lê.
 
 ## Changelog
 
-Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.6.0**.
+Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.7.0**.

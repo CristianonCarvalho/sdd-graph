@@ -1,6 +1,6 @@
 {
   "name": "speckit-graph",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Diagramas interativos do SpecKit: dependências de tasks, casos de uso e arquitetura, num HTML self-contained.",
   "type": "module",
   "bin": {
