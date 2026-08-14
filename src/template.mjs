@@ -19,7 +19,7 @@ function esc(s) {
  * @returns {string} HTML completo
  */
 export function renderHTML(data, opts = {}) {
-  const { project = 'meu-projeto', selfContained = true } = opts;
+  const { project = 'meu-projeto', selfContained = true, timeline = null } = opts;
   let html = fs.readFileSync(path.join(ROOT, 'src', 'template.html'), 'utf8');
 
   let d3Block;
@@ -30,12 +30,14 @@ export function renderHTML(data, opts = {}) {
     d3Block = `<script src="${CDN_D3}"></script>`;
   }
   const dataBlock = `<script>window.SPECKIT_DATA = ${esc(JSON.stringify(data))};</script>`;
+  const timelineBlock = timeline ? `<script>window.SPECKIT_TIMELINE = ${esc(JSON.stringify(timeline))};</script>` : '';
 
   // funções de substituição evitam a interpolação de $& / $` / $' etc.
   // que corromperia conteúdo contendo "$" (o D3 minificado usa muito).
   html = html
     .replace('<!--__D3__-->', () => d3Block)
     .replace('<!--__DATA__-->', () => dataBlock)
+    .replace('<!--__TIMELINE__-->', () => timelineBlock)
     .replace('<!--__PROJECT__-->', () => esc(project));
   return html;
 }

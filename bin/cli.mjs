@@ -148,7 +148,16 @@ function cmdGenerate(flags) {
     }
   }
 
-  const html = renderHTML(data, { project, selfContained });
+  // --timeline [N]: embute a evolução (progresso ao longo de N commits) para o painel visual
+  let timeline = null;
+  if (flags.timeline) {
+    const last = typeof flags.timeline === 'string' ? flags.timeline : '8';
+    const pts = collectTimelinePoints(specsDir, src, { refs: flags['timeline-refs'], last, noCurrent: false });
+    if (pts.length >= 2) timeline = buildTimeline(pts);
+    else console.error('  ⚠️  timeline ignorada: menos de 2 pontos válidos.');
+  }
+
+  const html = renderHTML(data, { project, selfContained, timeline });
   fs.writeFileSync(out, html);
 
   const specs = Object.keys(data);
@@ -161,6 +170,7 @@ function cmdGenerate(flags) {
   console.log(`  Specs (${specs.length}):\n${totals}`);
   if (src) console.log(`  Arquitetura escopada a: ${src}`);
   if (diffLabel) console.log(`  Diff sobreposto vs. base: ${diffLabel}`);
+  if (timeline) console.log(`  Timeline embutida: ${timeline.points.length} pontos`);
   console.log(`  Modo: ${selfContained ? 'self-contained (offline)' : 'CDN'}`);
   if (flags.open) { openFile(out); console.log('  Abrindo no navegador…'); }
 }
@@ -324,31 +334,32 @@ function cmdDiff(args) {
   else console.log(out);
 }
 
+/** Coleta os pontos da timeline (mais antigo → mais novo), pulando refs sem specs válidos. */
+function collectTimelinePoints(specsDir, src, opts = {}) {
+  let refPoints;
+  if (opts.refs) {
+    refPoints = String(opts.refs).split(',').map(s => s.trim()).filter(Boolean).map(r => ({ ref: r, label: r, date: null }));
+  } else {
+    const n = Math.max(1, parseInt(opts.last, 10) || 5);
+    refPoints = gitCommitsTouchingSpecs(n, specsDir);
+    if (!refPoints.length) { console.error('✗ nenhum commit tocou os specs — use --refs <a,b,c>.'); process.exit(2); }
+  }
+  const points = [];
+  for (const rp of refPoints) {
+    try { points.push({ label: rp.label, date: rp.date, snapshot: snapshotFromGitRef(rp.ref, specsDir, src) }); }
+    catch (e) { console.error(`  ⚠️  pulando ${rp.ref}: ${e.message}`); }
+  }
+  if (!opts.noCurrent) points.push({ label: 'atual', date: null, snapshot: buildSnapshot(parseSpecs(specsDir, { src })) });
+  return points;
+}
+
 function cmdTimeline(args) {
   const flags = args.flags;
   const specsDir = findSpecsDir(flags.specs);
   const src = flags.src ? path.resolve(flags.src) : null;
   const project = flags.project || deriveProjectName(specsDir);
 
-  // pontos: refs explícitos (--refs a,b,c) ou os últimos N commits que tocaram os specs (--last N, default 5)
-  let refPoints;
-  if (typeof flags.refs === 'string') {
-    refPoints = flags.refs.split(',').map(s => s.trim()).filter(Boolean).map(r => ({ ref: r, label: r, date: null }));
-  } else {
-    const n = Math.max(1, parseInt(flags.last, 10) || 5);
-    refPoints = gitCommitsTouchingSpecs(n, specsDir);
-    if (!refPoints.length) { console.error('✗ nenhum commit tocou os specs — use --refs <a,b,c>.'); process.exit(2); }
-  }
-
-  const points = [];
-  for (const rp of refPoints) {
-    try { points.push({ label: rp.label, date: rp.date, snapshot: snapshotFromGitRef(rp.ref, specsDir, src) }); }
-    catch (e) { console.error(`  ⚠️  pulando ${rp.ref}: ${e.message}`); }
-  }
-  // ponto final: estado atual (working tree), a menos que --no-current
-  if (flags['no-current'] !== true) {
-    points.push({ label: 'atual', date: null, snapshot: buildSnapshot(parseSpecs(specsDir, { src })) });
-  }
+  const points = collectTimelinePoints(specsDir, src, { refs: flags.refs, last: flags.last, noCurrent: flags['no-current'] === true });
   if (points.length < 2) { console.error('✗ timeline precisa de ao menos 2 pontos válidos.'); process.exit(2); }
 
   const tl = buildTimeline(points);
@@ -384,6 +395,8 @@ function main() {
     --doctor        imprime o diagnóstico do plano (ciclos, FR órfã, tasks soltas…)
     --diff <base>   sobrepõe no grafo o que mudou desde a base (git-ref ou snapshot.json):
                     novo/concluído/alterado, com card lateral (toggle 🕒 diff)
+    --timeline [N]  embute a evolução dos últimos N commits (default 8) num painel
+                    visual (📈 timeline): gráfico de progresso + tabela por ponto
 
   speckit-graph doctor [--specs <dir>] [--src <dir>] [--strict]
     diagnóstico determinístico do plano; --strict sai com código ≠0 se houver erro

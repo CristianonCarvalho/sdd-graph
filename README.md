@@ -158,6 +158,13 @@ Progresso: `▂▃▅▆█`  11% → 80%  (5 pontos)
 No período: 6 concluída(s) · 2 nova(s) · 0 removida(s) · achados +1 / −3
 ```
 
+**Timeline visual no HTML** — passe `--timeline [N]` ao gerar para embutir a evolução (últimos N commits, default 8) num painel: botão **📈 timeline** abre um **gráfico de progresso** (área + linha, com % por ponto) e a **tabela** (progresso, concluídas, novas, erros/avisos por ponto).
+
+```bash
+speckit-graph --timeline --open        # últimos 8 commits + estado atual
+speckit-graph --timeline 12 --open
+```
+
 ## Comando /speckit-graph (Claude Code, GitHub Copilot e Kiro)
 
 Instale o comando `/speckit-graph` nas três ferramentas de IA de uma vez:
