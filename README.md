@@ -3,6 +3,8 @@
 Diagramas interativos dos artefatos do [SpecKit](https://github.com/github/spec-kit).
 Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
+![Aba de Dependências: grafo em camadas das tasks, com caminho crítico animado, formas por prioridade e painel de progresso](docs/img/deps.png)
+
 - **Dependências** — grafo dirigido em camadas das tasks (layout com redução de cruzamentos por barycenter; grafos grandes, a partir de 400 nós, usam **Sugiyama completo** — dummies + minimização por mediana + arestas roteadas pelas camadas): cor = prioridade (P1/P2/P3, Setup, Fundação, Polish), tamanho = quão bloqueante, **caminho crítico** animado. Barra de **progresso** (geral e por prioridade, lida dos checkboxes `- [x]`) e painel **"faça isto a seguir"** com as tasks já desbloqueadas (todas as dependências concluídas); concluídas ganham anel verde, prontas ganham anel âmbar. Botão **📋 kanban** abre um quadro read-only (derivado do plano, nunca editável) com quatro colunas — concluídas · **em andamento** (`- [~]`) · prontas p/ começar · **bloqueadas** (calculadas pelas dependências) — bom para a daily.
 - **Casos de uso** — ator → casos de uso (user stories do `spec.md`, cor por prioridade) → requisitos (FR) que cada um cobre.
 - **Arquitetura** — componentes e fluxo (Web UI → API → Serviços → integrações/modelos → sistemas externos e banco). Se houver código **Python, Java, TypeScript/JavaScript ou Go** em `src/`, **lê os `import`s** e liga cada serviço ao adapter/modelo real (preciso); senão, deriva das pastas + `plan.md` (heurístico). O subtítulo indica qual dos dois. Por linguagem: **Python** — absolutos (`from src.a.b`) e **relativos** (`from ..integrations.binance import ...`); **Java** — `import`s sob o pacote-base detectado; **TS/JS** — relativos (`../services/x`) e alias de raiz (`@/…`, `~/…`, `src/…`), pacotes externos (bare, ex.: `react`) ignorados; **Go** — imports que começam pelo módulo do `go.mod` (contêineres `internal/`, `pkg/`, `cmd/` são transparentes). Nomes de camada variados são normalizados (EN + **PT-BR**: service/servico, controller/controle, repository/repositorio, gateway/integracao…). **Monorepo:** use `--src <pasta-da-feature>` para escopar a varredura, senão o pacote-base fica genérico demais e a arquitetura não é reconhecida.
@@ -12,6 +14,28 @@ Comum às três: hover ilumina a cadeia, clique abre o detalhe (com **métricas*
 Fontes lidas (somente leitura, nunca escreve): `tasks.md` (dependências), `spec.md` (casos de uso e texto dos FRs), `plan.md` (stack), e — quando existir — `src/**/*.{py,java,ts,tsx,js,jsx,go}` (acoplamento real na aba Arquitetura).
 
 Zero dependências de runtime (Node ≥ 18). D3 embutido no HTML.
+
+## Telas
+
+**Casos de uso** — ator → histórias de usuário → requisitos (FR) que cada uma cobre; requisitos sem task vinculada aparecem esmaecidos.
+
+![Aba de Casos de uso: ator ligado às user stories e aos requisitos funcionais](docs/img/usecases.png)
+
+**Arquitetura** — componentes e fluxo lidos dos `import`s do código (aqui, TypeScript): cada serviço ligado ao adapter/modelo real, até os sistemas externos e o banco.
+
+![Aba de Arquitetura: fluxo de Operador a Web UI, API, serviços, adapters, modelos e banco](docs/img/arch.png)
+
+**Kanban** — quadro read-only derivado do plano: concluídas · em andamento (`[~]`) · prontas p/ começar · bloqueadas (calculadas pelas dependências).
+
+![Painel Kanban com quatro colunas de status das tasks](docs/img/kanban.png)
+
+**Diff** — o que mudou desde uma base (git-ref ou snapshot), sobreposto no grafo (🟢 concluída · 🔵 nova · 🟡 alterada) com card lateral.
+
+![Sobreposição de diff no grafo, marcando as tasks concluídas desde a base](docs/img/diff.png)
+
+**Timeline** — evolução do progresso ao longo dos commits: gráfico + tabela por ponto.
+
+![Painel de Timeline com gráfico de progresso subindo ao longo de três commits](docs/img/timeline.png)
 
 ## Uso rápido
 
