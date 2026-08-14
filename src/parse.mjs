@@ -124,13 +124,14 @@ function planFields(specDir) {
   };
 }
 
-/** Lista arquivos com uma extensão sob dir (recursivo), pulando caminhos de teste. */
+/** Lista arquivos com uma extensão sob dir (recursivo), pulando testes/deps/artefatos. */
+const SKIP_DIRS = /^(test|tests|__tests__|node_modules|dist|build|out|target|vendor|\.git)$/;
 function walkFiles(dir, ext) {
   const out = [];
   (function w(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
-      if (e.isDirectory()) { if (!/(^|\/)(test|tests)$/.test(p)) w(p); }
+      if (e.isDirectory()) { if (!SKIP_DIRS.test(e.name)) w(p); }
       else if (e.name.endsWith(ext)) out.push(p);
     }
   })(dir);
@@ -207,6 +208,91 @@ function scanJavaSource(srcRoot) {
     return { group: canonGroup(rem[0]), sub: rem[1] || null, module: p.cls, imports };
   });
   return { files: out, lang: 'Java', baseAmbiguous };
+}
+
+/** Resolve um import de TS/JS a {group,name,prov}. Retorna null se for pacote externo (bare). */
+function resolveJsImport(spec, dirParts) {
+  if (spec.startsWith('.')) {
+    // relativo: resolvido contra o diretório do arquivo (proveniência inferida)
+    const sp = spec.split('/').filter(s => s !== '' && s !== '.');
+    let base = dirParts.slice();
+    for (const s of sp) { if (s === '..') base = base.slice(0, -1); else base.push(s); }
+    if (!base.length) return { group: null, name: null, prov: 'unresolved' };
+    return { group: canonGroup(base[0]), name: base[1] || null, prov: 'inferred' };
+  }
+  if (/^(@|~|src)\//.test(spec)) {
+    // alias comum para a raiz do src (@/… ~/… src/…) — proveniência exata
+    const sp = spec.replace(/^(@|~|src)\//, '').split('/').filter(Boolean);
+    return { group: canonGroup(sp[0]), name: sp[1] || null, prov: 'exact' };
+  }
+  return null; // bare specifier (react, lodash, @scope/pkg) = dependência externa, ignorada
+}
+
+/** TS/JS: imports internos (relativos e alias @//~//src/). Externos (bare) são ignorados. */
+export function scanJsSource(srcDir) {
+  if (!fs.existsSync(srcDir)) return null;
+  let files = [];
+  for (const ext of ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']) files = files.concat(walkFiles(srcDir, ext));
+  files = files.filter(f => !/\.d\.ts$/.test(f) && !/\.(test|spec)\.[jt]sx?$/.test(f));
+  if (!files.length) return null;
+  const out = files.map(abs => {
+    const parts = path.relative(srcDir, abs).replace(/\.(tsx?|jsx?|mjs|cjs)$/, '').split(path.sep);
+    const dirParts = parts.slice(0, -1);
+    const text = fs.readFileSync(abs, 'utf8');
+    const specs = [];
+    let m;
+    const patterns = [
+      /(?:import|export)[^'"]*?from\s*['"]([^'"]+)['"]/g,  // import x from '…' / export … from '…'
+      /import\s*['"]([^'"]+)['"]/g,                        // import '…' (side-effect)
+      /require\(\s*['"]([^'"]+)['"]\s*\)/g,                // require('…')
+      /import\(\s*['"]([^'"]+)['"]\s*\)/g,                 // import('…') dinâmico
+    ];
+    for (const re of patterns) while ((m = re.exec(text)) !== null) specs.push(m[1]);
+    const imports = [];
+    for (const s of [...new Set(specs)]) { const r = resolveJsImport(s, dirParts); if (r) imports.push(r); }
+    return { group: canonGroup(parts[0]), sub: parts.length > 2 ? parts[1] : null, module: parts[parts.length - 1], imports };
+  });
+  return { files: out, lang: 'TypeScript/JavaScript' };
+}
+
+// Diretórios "contêiner" do Go que não são camadas (a camada vem do próximo segmento).
+const GO_CONTAINERS = new Set(['internal', 'pkg', 'cmd', 'app', 'src']);
+function dropContainers(segs) { let i = 0; while (i < segs.length && GO_CONTAINERS.has(segs[i])) i++; return segs.slice(i); }
+
+/** Módulo declarado no go.mod mais próximo (subindo a partir de dir). */
+function findGoModule(dir) {
+  let d = dir;
+  for (let i = 0; i < 6; i++) {
+    const f = path.join(d, 'go.mod');
+    if (fs.existsSync(f)) { const m = fs.readFileSync(f, 'utf8').match(/^\s*module\s+(\S+)/m); return m ? m[1] : null; }
+    const up = path.dirname(d); if (up === d) break; d = up;
+  }
+  return null;
+}
+
+/** Go: imports internos (caminho começa com o módulo do go.mod). Stdlib/externos ignorados. */
+export function scanGoSource(srcDir) {
+  if (!fs.existsSync(srcDir)) return null;
+  const files = walkFiles(srcDir, '.go').filter(f => !/_test\.go$/.test(f));
+  if (!files.length) return null;
+  const mod = findGoModule(srcDir);
+  const out = files.map(abs => {
+    const parts = path.relative(srcDir, abs).replace(/\.go$/, '').split(path.sep);
+    const layer = dropContainers(parts.slice(0, -1));
+    const text = fs.readFileSync(abs, 'utf8');
+    const paths = [];
+    (text.match(/import\s*\(([\s\S]*?)\)/g) || []).forEach(b => { let mm; const re = /"([^"]+)"/g; while ((mm = re.exec(b)) !== null) paths.push(mm[1]); });
+    (text.match(/^\s*import\s+(?:[\w.]+\s+)?"([^"]+)"/gm) || []).forEach(s => { const mm = s.match(/"([^"]+)"/); if (mm) paths.push(mm[1]); });
+    const imports = [];
+    for (const p of paths) {
+      if (mod && p.startsWith(mod + '/')) {
+        const rem = dropContainers(p.slice(mod.length + 1).split('/'));
+        imports.push({ group: canonGroup(rem[0]), name: rem[1] || null, prov: 'exact' });
+      }
+    }
+    return { group: canonGroup(layer[0]), sub: layer[1] || null, module: parts[parts.length - 1], imports };
+  });
+  return { files: out, lang: 'Go' };
 }
 
 /** Arquitetura PRECISA: expande serviços e liga cada um ao adapter/modelo real (via imports). */
@@ -298,7 +384,7 @@ export function buildArch(tasks, specDir, srcOverride) {
   const meta = planFields(specDir);
   const projectRoot = path.resolve(specDir, '..', '..'); // specs/<slug> -> raiz do projeto
   const src = srcOverride ? path.resolve(srcOverride) : path.join(projectRoot, 'src');
-  const scan = scanPythonSource(src) || scanJavaSource(src);
+  const scan = scanPythonSource(src) || scanJavaSource(src) || scanJsSource(src) || scanGoSource(src);
   const STRUCT = new Set(['services', 'api', 'integrations', 'models', 'web', 'db']);
   if (scan && scan.files.some(f => STRUCT.has(f.group))) {
     if (!meta.language && scan.lang) meta.language = scan.lang;
