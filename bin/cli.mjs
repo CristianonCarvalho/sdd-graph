@@ -7,11 +7,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { execFile } from 'node:child_process';
+import { execFile, execSync } from 'node:child_process';
 import { parseSpecs } from '../src/parse.mjs';
 import { renderHTML } from '../src/template.mjs';
 import { buildGateReport, stringifyCanonical, gateMarkdown } from '../src/gate.mjs';
 import { buildSummary } from '../src/summary.mjs';
+import { buildSnapshot, diffReport, diffMarkdown } from '../src/diff.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -219,6 +220,75 @@ function cmdSummary(flags) {
   } else console.log(md);
 }
 
+function cmdSnapshot(args) {
+  const flags = args.flags;
+  const specsDir = findSpecsDir(flags.specs);
+  const src = flags.src ? path.resolve(flags.src) : null;
+  const data = parseSpecs(specsDir, { src });
+  const dest = path.resolve(args._[1] || flags.out || 'speckit-graph.snapshot.json');
+  fs.writeFileSync(dest, stringifyCanonical(buildSnapshot(data)));
+  const n = Object.keys(data).length;
+  console.error(`✓ snapshot gravado: ${dest} (${n} spec(s))`);
+}
+
+/** Materializa os specs (e o src, se dentro do repo) de um git ref e faz o snapshot. */
+function snapshotFromGitRef(ref, specsDir, src) {
+  let root;
+  try { root = execSync('git rev-parse --show-toplevel', { cwd: specsDir, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); }
+  catch { console.error(`✗ '${ref}' não é um arquivo .json nem um repositório git acessível. Use --from <snapshot.json> ou rode dentro de um repo git.`); process.exit(2); }
+  const rel = p => path.relative(root, path.resolve(p)).split(path.sep).join('/');
+  const relSpecs = rel(specsDir);
+  const relSrc = src ? rel(src) : null;
+  const paths = [relSpecs];
+  if (relSrc && !relSrc.startsWith('..')) paths.push(relSrc);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-diff-'));
+  try {
+    execSync(`git archive ${ref} -- ${paths.map(p => `'${p}'`).join(' ')} | tar -x -C '${tmp}'`, { cwd: root, stdio: ['ignore', 'ignore', 'pipe'] });
+    const tmpSpecs = path.join(tmp, relSpecs);
+    const tmpSrc = relSrc && !relSrc.startsWith('..') ? path.join(tmp, relSrc) : null;
+    return buildSnapshot(parseSpecs(tmpSpecs, { src: tmpSrc && fs.existsSync(tmpSrc) ? tmpSrc : null }));
+  } catch (e) {
+    console.error(`✗ não consegui ler os specs do ref '${ref}': ${String(e.stderr || e.message).trim()}`);
+    process.exit(2);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+function cmdDiff(args) {
+  const flags = args.flags;
+  const specsDir = findSpecsDir(flags.specs);
+  const src = flags.src ? path.resolve(flags.src) : null;
+  const fromArg = (typeof flags.from === 'string' && flags.from) || args._[1];
+  if (!fromArg) {
+    console.error('✗ diff: informe a base com --from <snapshot.json | git-ref>');
+    console.error('  ex.: speckit-graph diff --from HEAD~1     (compara com o commit anterior)');
+    console.error('       speckit-graph diff --from base.json  (compara com um snapshot salvo)');
+    process.exit(2);
+  }
+  const to = buildSnapshot(parseSpecs(specsDir, { src }));
+
+  let from;
+  const asFile = path.resolve(fromArg);
+  if (/\.json$/i.test(fromArg) || fs.existsSync(asFile)) {
+    let j;
+    try { j = JSON.parse(fs.readFileSync(asFile, 'utf8')); }
+    catch { console.error(`✗ não consegui ler o snapshot: ${asFile}`); process.exit(2); }
+    if (j && j.kind === 'snapshot' && j.specs) from = j;
+    else { console.error('✗ arquivo não é um snapshot do speckit-graph (gere com `speckit-graph snapshot`).'); process.exit(2); }
+  } else {
+    from = snapshotFromGitRef(fromArg, specsDir, src);
+  }
+
+  const rep = diffReport(from, to);
+  const project = flags.project || deriveProjectName(specsDir);
+  const wantJson = 'json' in flags;
+  const out = wantJson ? stringifyCanonical(rep) : diffMarkdown(rep, { project });
+  const dest = (typeof flags.json === 'string' && flags.json) || (typeof flags.out === 'string' && flags.out) || null;
+  if (dest) { fs.writeFileSync(path.resolve(dest), out); console.error(`✓ diff: ${path.resolve(dest)}`); }
+  else console.log(out);
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const sub = args._[0];
@@ -227,6 +297,8 @@ function main() {
     if (sub === 'doctor' || args.flags.doctor) return cmdDoctor(args.flags);
     if (sub === 'check' || args.flags.check) return cmdCheck(args.flags);
     if (sub === 'summary' || 'summary' in args.flags) return cmdSummary(args.flags);
+    if (sub === 'snapshot') return cmdSnapshot(args);
+    if (sub === 'diff') return cmdDiff(args);
     if (sub === 'help' || args.flags.help) {
       console.log(`speckit-graph — diagramas interativos do SpecKit (dependências, casos de uso, arquitetura)
 
@@ -251,6 +323,18 @@ function main() {
     --baseline <path>  reprova só em achados NOVOS vs. baseline (adoção gradual)
     --update-baseline  (re)grava o baseline com os achados atuais e sai 0
     exit: 0 passou · 1 reprovou · 2 erro de execução
+
+  speckit-graph snapshot [arquivo] [--specs <dir>] [--src <dir>]
+    grava um snapshot do plano (default: ./speckit-graph.snapshot.json)
+    versione-o para comparar a evolução depois com o comando diff
+
+  speckit-graph diff --from <snapshot.json | git-ref> [opções]
+    compara a base (--from) com o plano atual: tasks novas/concluídas,
+    mudanças de status/prioridade/deps e achados que surgiram/sumiram
+    --from HEAD~1      compara com um commit (materializa os specs do ref)
+    --from base.json   compara com um snapshot salvo
+    --json [arquivo]   emite JSON canônico (default: Markdown no stdout)
+    --out <arquivo>    grava a saída em arquivo
 
   speckit-graph init [--global] [--target <lista>]
     instala o comando /speckit-graph nas ferramentas de IA

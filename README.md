@@ -106,6 +106,36 @@ speckit-graph check --format md --base-url https://ci.exemplo/speckit-graph.html
 
 O Markdown traz um marcador `<!-- speckit-graph -->` para o comentário ser atualizado (não duplicado) a cada push.
 
+## Diff / Timeline — o que mudou no plano
+
+Compara **duas versões do plano** e resume a evolução, de forma determinística: tasks **concluídas** desde a base, **novas/removidas**, mudanças de **status** (`todo`/`doing`/`done`), **prioridade** e **dependências**, e achados do Doctor que **surgiram/sumiram** — mais o delta de progresso.
+
+A base (`--from`) pode ser um **git ref** (comparação instantânea entre commits) ou um **snapshot salvo** (não precisa de git):
+
+```bash
+# vs. um commit — materializa os specs daquele ref via `git archive`
+speckit-graph diff --from HEAD~1
+speckit-graph diff --from v1.0 --src src/gov/rfb/consulta   # monorepo: escopa o código
+
+# vs. um snapshot versionado (determinístico, sem git)
+speckit-graph snapshot base.json     # grava o estado atual
+git add base.json                    # versione junto do plano
+# … tempo depois …
+speckit-graph diff --from base.json  # o que mudou desde então
+```
+
+Saída em **Markdown** (stdout, bom para PR/issue/ata) ou **JSON canônico** com `--json [arquivo]`; `--out <arquivo>` grava em disco. Exemplo de saída:
+
+```
+**1 concluída(s)** desde a base · 0 nova(s) · 0 removida(s) · achados: +0 / −0
+#### 001-clean
+Progresso: 25% → 50% (2/4, +1 concluída(s))
+✅ Concluídas: T002
+🔄 Status: T003 todo→doing
+```
+
+O snapshot é um JSON pequeno (status/prioridade/deps/frs das tasks, achados por `fingerprint` e progresso) — o mesmo plano gera sempre os mesmos bytes.
+
 ## Comando /speckit-graph (Claude Code, GitHub Copilot e Kiro)
 
 Instale o comando `/speckit-graph` nas três ferramentas de IA de uma vez:
