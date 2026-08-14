@@ -14,7 +14,8 @@
     "README.md"
   ],
   "scripts": {
-    "start": "node bin/cli.mjs --open"
+    "start": "node bin/cli.mjs --open",
+    "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=18"

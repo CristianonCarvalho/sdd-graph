@@ -151,6 +151,16 @@ npm link                       # disponibiliza o binário `speckit-graph`
 export SPECKIT_GRAPH_HOME=/caminho/para/speckit-graph
 ```
 
+## Testes
+
+Suíte com o runner nativo do Node (`node:test`, zero dependências):
+
+```bash
+npm test          # ou: node --test test/*.test.mjs
+```
+
+Cobre o núcleo determinístico — parser (incl. imports relativos), Doctor (regras + ordenação), CI Gate (baseline, fingerprint, JSON canônico), índice de confiança e resumo. Rodam em CI (Node 18/20/22) via [`.github/workflows/test.yml`](.github/workflows/test.yml).
+
 ## Como o parser entende o SpecKit
 
 - Fases (`## Phase N: ...`) definem a user story e a prioridade (`Priority: P1`).
