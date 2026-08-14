@@ -36,6 +36,11 @@ export function parseProject({ specsDir, src, adapter } = {}) {
     for (const [slug, unit] of Object.entries(units)) out[namespaced ? `${ad.name}:${slug}` : slug] = unit;
   }
   if (!Object.keys(out).length) {
+    // Nada detectado: pede a cada adapter uma dica do que viu (ex.: achou artefatos de um
+    // modo que ele ainda não sabe ler) — mensagem genérica de "specs não encontrado" some
+    // enganosa quando o projeto usa uma fonte diferente do SpecKit.
+    const hints = ADAPTERS.map(a => (typeof a.hint === 'function' ? a.hint(specsDir) : null)).filter(Boolean);
+    if (hints.length) throw new Error(`Nenhuma unidade SDD encontrada em ${specsDir}. ${hints.join(' ')}`);
     if (specsDir && !fs.existsSync(specsDir)) throw new Error(`Diretório não encontrado: ${specsDir}`);
     throw new Error(`Nenhuma unidade SDD encontrada em ${specsDir}`);
   }

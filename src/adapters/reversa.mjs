@@ -19,6 +19,7 @@ import { runDoctor } from '../doctor.mjs';
 import { computeConfidence } from '../confidence.mjs';
 
 const FORWARD_DIR = '_reversa_forward';
+const SDD_DIR = '_reversa_sdd'; // saída do modo REVERSO — ainda não lida (ver hint())
 
 /** specsDir é reinterpretado como "um caminho dentro do projeto" (mesma convenção do
  *  adapter SpecKit); a raiz do projeto é o pai desse caminho. */
@@ -39,6 +40,20 @@ function detect(specsDir) {
     }
   } catch { /* ignora */ }
   return 0;
+}
+
+/** Dica quando nada foi detectado: projeto usa o modo reverso do Reversa (_reversa_sdd/),
+ *  que esta versão ainda não lê (só o pipeline forward). Evita o erro genérico e enganoso
+ *  de "specs não encontrado" nesse caso — ver docs/aidlc.md e docs/plano-sdd-graph.md B.6. */
+function hint(specsDir) {
+  if (detect(specsDir)) return null; // forward existe, nada a avisar
+  const root = projectRoot(specsDir);
+  if (fs.existsSync(path.join(root, SDD_DIR))) {
+    return `Encontrei '${SDD_DIR}/' (modo reverso do Reversa — arquitetura/ERD extraídos do legado), ` +
+      `mas essa versão só lê o pipeline forward ('${FORWARD_DIR}/<slug>/actions.md', tasks de novas features). ` +
+      `Leitura do modo reverso ainda não implementada — ver docs/plano-sdd-graph.md (seção B.6).`;
+  }
+  return null;
 }
 
 /** Linhas de tabela Markdown (ignora linha separadora `|---|---|`). */
@@ -190,5 +205,6 @@ export default {
   label: 'Reversa',
   detect,
   parse,
+  hint,
   capabilities: { deps: true, stories: true, requirements: 'RF', architecture: 'heuristic' },
 };

@@ -270,8 +270,27 @@ Pasta `_reversa_sdd/`:
 vez de recalcular. `architecture:'native'` evita a varredura de imports (útil em legado
 grande). O modo forward encaixa no grafo de dependências sem esforço de modelagem.
 
-**Capabilities:** `{ deps: (tem forward?), stories: true, requirements:'FR',
-architecture:'native' }`.
+**Capabilities (como implementado):** `{ deps: true, stories: true, requirements:'RF',
+architecture:'heuristic' }` — `'native'` (ler `_reversa_sdd/`) ainda não implementado, ver
+nota "Implementado" no início desta seção.
+
+## B.6.1 Estudo: **AI-DLC** (awslabs/aidlc-workflows) — análise completa em `docs/aidlc.md`
+
+Investigado a pedido, mesmo rigor do BMad/Reversa (formato confirmado na fonte). **Achado
+decisivo:** ao contrário do SpecKit/Reversa, os 3 artefatos-chave do AI-DLC (requisitos,
+user stories, "unidades de trabalho" — nosso equivalente a `Task[]`/Dependências) **não
+têm template fixo**; a própria regra-fonte do projeto (`units-generation.md`) admite
+textualmente que não há "markdown templates, schemas, ID formats, or example tables". É
+uma filosofia de design (steering rules pro julgamento de um LLM), não uma lacuna
+temporária como a do BMad.
+
+**Veredito:** não implementar um parser direto agora — risco maior que o do BMad (que ao
+menos *tinha* um contrato fixo antes de mudar). A análise completa em `docs/aidlc.md`
+cobre a estrutura de saída confirmada e **3 soluções possíveis** avaliadas: (1) regra-ponte
+que pede ao próprio agente do usuário para também gravar um JSON de formato fixo definido
+por nós — **recomendada**, mantém 100% dos princípios do projeto; (2) adapter heurístico
+best-effort sem grafo de dependências confiável — fallback; (3) extração assistida por
+LLM em tempo de geração — fora de escopo (quebraria zero-deps/determinismo como padrão).
 
 ## B.7 Impacto por módulo do núcleo
 
@@ -459,3 +478,4 @@ recomendável só em marcos (fim de fase), não a cada commit.
 - Reversa — **formato confirmado verbatim** (usado para implementar o adapter):
   `templates/forward/body/actions-template.md` e `requirements-template.md` no repositório
   `sandeco/reversa` (branch `main`).
+- AI-DLC (awslabs/aidlc-workflows) — fontes completas em [`docs/aidlc.md`](aidlc.md).
