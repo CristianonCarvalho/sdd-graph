@@ -207,3 +207,7 @@ Cobre o núcleo determinístico — parser (incl. imports relativos), Doctor (re
 - Requisitos: qualquer `FR-XXX` citado na descrição.
 
 Nunca escreve nos arquivos de spec — apenas lê.
+
+## Changelog
+
+Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.6.0**.
