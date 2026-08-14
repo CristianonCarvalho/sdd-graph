@@ -219,6 +219,25 @@ export default {
 
 ## B.6 Adapter **Reversa** (sandeco/reversa)
 
+> ✅ **Implementado** (`src/adapters/reversa.mjs`, Fase 3 — adiantada, ver Parte C). Escopo:
+> **só o pipeline forward** (tasks + requisitos). O formato foi confirmado **verbatim**
+> contra os templates reais do projeto (`templates/forward/body/actions-template.md` e
+> `requirements-template.md` em github.com/sandeco/reversa) — não contra a descrição solta
+> da tabela abaixo, que era só um resumo de pesquisa. Correções em relação ao desenho
+> original: não existe `progress.jsonl` nem estado "em andamento" (só `[ ]`/`[X]`); o
+> prefixo de requisito é **RF** (não FR); prioridade de task vem da **fase** (Preparação→
+> SETUP, Polimento→POLISH, demais sem prioridade) **ou herdada do MoSCoW** do RF citado;
+> "Personas e cenários de uso" viram `stories`, mas **sem vínculo formal a RF** na fonte
+> (o Doctor sinaliza isso honestamente via `STORY_NO_FR`, esperado). Arquitetura usa o
+> heurístico existente (`buildArchHeuristic`, exportado), alimentado pelo "Arquivo alvo"
+> real de cada ação — funciona quando os caminhos seguem a convenção `src/…`.
+>
+> O lado **(b) reverse specs** abaixo (`_reversa_sdd/`) permanece **não implementado**: são
+> arquivos gerados livremente por IA (sem template fixo confirmado no repositório — só o
+> viewer de documentação e os agentes, não um schema), diferente do forward (que tem
+> templates rígidos). Fica para um incremento futuro, quando/se valer a pena investigar os
+> prompts dos agentes para inferir a estrutura real gerada.
+
 Reversa tem **dois modos** — e ambos são úteis:
 
 ### (a) Forward pipeline → alimenta Dependências/Requisitos
@@ -314,13 +333,18 @@ ferramentas diferentes, cada uma com **badge da fonte**.
 
 # PARTE C — Roadmap em fases (releases)
 
-| Fase | Entrega | Versão sugerida | Quebra? |
+| Fase | Entrega | Versão | Quebra? |
 |---|---|---|---|
-| **0** | Modelo canônico + registry de adapters; refactor do SpecKit para `adapters/speckit.mjs` (sem mudança visível; testes verdes) | 0.7.x (interno) | Não |
-| **1** | **Renomeação → SDD-Graph** (Parte A), com aliases e *deprecation* | **0.8.0** | Não (com aliases) |
-| **2** | **Adapter BMad** + detecção + docs | 0.9.0 | Não |
-| **3** | **Adapter Reversa** (forward = tasks; reverse = arquitetura nativa; importa confiança/gaps) | 0.10.0 | Não |
-| **4** | Generalização do Doctor por *capabilities* + novas abas (ERD/API/fluxos) | 1.0.0 | Não |
+| **0** | Modelo canônico + registry de adapters; refactor do SpecKit para `adapters/speckit.mjs` (sem mudança visível; testes verdes) | 0.7.x (interno) | ✅ Não |
+| **1** | **Renomeação → SDD-Graph** (Parte A), com aliases e *deprecation* | **0.8.0** ✅ | Não (com aliases) |
+| **2** | ~~Adapter BMad~~ **adiada** — v6.11.0 restructurou PRD/epics/stories pra um contrato novo (`stories.yaml`) 5 dias antes desta etapa; o formato documentado (docs/stories/\*.md) está em shim de compatibilidade a caminho da remoção na v7. Retomar quando estabilizar ou houver um projeto real pra validar contra. | — | — |
+| **3** | **Adapter Reversa** — **adiantada** (ordem invertida: formato confirmado por template real, ao contrário do BMad). Escopo: só o pipeline **forward** (tasks + requisitos); reverse/arquitetura nativa fica para depois (ver B.6). | **0.9.0** ✅ | Não |
+| **4** | Generalização do Doctor por *capabilities* + novas abas (ERD/API/fluxos); retomar BMad; arquitetura nativa do Reversa | 1.0.0 | Não |
+
+**Lição da Fase 2→3:** antes de codar um parser contra um formato de terceiros, confirme
+a estrutura **verbatim** (template/exemplo real), não a descrição de uma busca. Isso
+evitou construir o adapter BMad contra um formato que mudou 5 dias antes, e permitiu
+validar o Reversa com confiança (10 testes passaram de primeira, sem retrabalho).
 
 Cada fase é independente e testável isoladamente (padrão que já usamos: núcleo puro +
 `node:test` + validação headless do HTML).
@@ -335,9 +359,13 @@ Cada fase é independente e testável isoladamente (padrão que já usamos: núc
 3. **Renomear o repo** `speckit-graph → sdd-graph` (redirect cobre os links) ou criar
    repo novo?
 4. **Por quanto tempo** manter os aliases `/speckit-graph` e binário antigo?
-5. **BMad:** alvo v4 (`.bmad-core/`) ou v5? Suportar *expansion packs*?
-6. **Reversa:** priorizar o **forward** (tasks) primeiro, ou já entrar com o **reverse**
-   (arquitetura nativa + ERD/API)?
+5. **BMad:** ~~v4 ou v5?~~ **achado novo:** v6.11.0 (09/08/2026) reestruturou tudo pra
+   `stories.yaml` + `bmad-prd`; docs/stories/\*.md vira shim rumo à remoção na v7. Decisão
+   agora é: esperar estabilizar, ou construir contra um projeto BMad real que você tenha
+   à mão (mais confiável que qualquer versão da doc)?
+6. ~~**Reversa:** priorizar o forward ou o reverse?~~ **Resolvido:** forward implementado
+   na v0.9.0 (B.6). O reverse (arquitetura nativa/ERD/API) fica pra depois — sem template
+   fixo confirmado no repositório (é texto livre gerado por IA).
 7. **Prioridade** em BMad/Reversa (sem P1/P2/P3): derivar de ordem/fase, campo dedicado,
    ou deixar neutra?
 8. **Novas abas** (ERD/API/fluxos) entram no escopo ou ficam para depois?
@@ -423,7 +451,11 @@ recomendável só em marcos (fim de fase), não a cada commit.
 
 ## Fontes consultadas
 
-- BMAD-METHOD — estrutura de PRD/epics/stories: docs e discussões do repo
-  `bmad-code-org/BMAD-METHOD` e material de referência da comunidade.
-- Reversa — estrutura de saída (`_reversa_sdd/`, `_reversa_forward/`, `actions.md`,
-  `confidence-report.md`, `gaps.md`): repositório `sandeco/reversa`.
+- BMAD-METHOD — estrutura de PRD/epics/stories (desatualizada, ver achado abaixo): docs e
+  discussões do repo `bmad-code-org/BMAD-METHOD`.
+- BMAD-METHOD — `CHANGELOG.md` do repo: confirma a reestruturação v6.11.0 (09/08/2026,
+  `stories.yaml`, `bmad-prd`) que motivou adiar a Fase 2.
+- Reversa — estrutura de saída, primeira leitura: `README.md` do repo `sandeco/reversa`.
+- Reversa — **formato confirmado verbatim** (usado para implementar o adapter):
+  `templates/forward/body/actions-template.md` e `requirements-template.md` no repositório
+  `sandeco/reversa` (branch `main`).

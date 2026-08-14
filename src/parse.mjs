@@ -355,8 +355,9 @@ function buildArchFromSource(scan, meta) {
   return { nodes, links: uniq, meta, source: true, baseAmbiguous: !!scan.baseAmbiguous, provenance: { imports: ie } };
 }
 
-/** Arquitetura HEURÍSTICA (fallback): só specs, sem ler código. Serviços como um nó único. */
-function buildArchHeuristic(tasks, meta) {
+/** Arquitetura HEURÍSTICA (fallback): só specs, sem ler código. Serviços como um nó único.
+ *  Exportada para reuso por outros adapters (ex.: Reversa, a partir do "Arquivo alvo"). */
+export function buildArchHeuristic(tasks, meta) {
   const top = {};
   const pathRe = /src\/([a-zA-Z0-9_]+)(?:\/([a-zA-Z0-9_]+))?/g;
   tasks.forEach(t => { let m; while ((m = pathRe.exec(t.label)) !== null) { (top[m[1]] = top[m[1]] || new Set()); if (m[2] && m[2] !== 'main') top[m[1]].add(m[2]); } });

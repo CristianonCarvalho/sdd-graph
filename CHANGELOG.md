@@ -4,6 +4,38 @@ Todas as mudanças relevantes deste projeto. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.9.0] — 2026-08-14
+
+**Segundo adapter SDD: Reversa** (github.com/sandeco/reversa) — ordem do roadmap
+invertida em relação ao planejado: o adapter BMad foi adiado porque o BMAD-METHOD
+lançou uma reestruturação grande (v6.11.0, 5 dias antes) trocando `docs/stories/*.md`
+por um contrato `stories.yaml`; o Reversa entrou primeiro porque seu formato foi
+confirmado **verbatim** contra os templates reais do projeto fonte.
+
+### Adapter Reversa (`src/adapters/reversa.mjs`)
+- Lê o pipeline **forward**: `_reversa_forward/<slug>/actions.md` (tasks — ids `T###`,
+  dependências, marcador de paralelismo `[//]`, status `[ ]`/`[X]`) e `requirements.md`
+  (requisitos `RF-##` com prioridade MoSCoW, personas → casos de uso).
+- Prioridade de task: da **fase** (Preparação→SETUP, Polimento→POLISH) ou **herdada** do
+  MoSCoW do RF citado (Must→P1, Should→P2, Could→P3) quando a fase não define uma.
+- Arquitetura via heurístico existente, alimentado pelo caminho real de "Arquivo alvo".
+- **Reusa 100% do núcleo sem código novo**: Doctor, índice de confiança, gate, diff,
+  timeline e o HTML funcionam sem alteração — confirma a arquitetura de adapters da
+  Fase 0.
+- Lado **reverse** (`_reversa_sdd/`: C4, ERD, arquitetura nativa) fica de fora desta
+  versão — é texto livre gerado por IA, sem template fixo confirmado no repositório.
+
+### Coexistência de múltiplas fontes (B.9)
+- `parseProject()` agora **agrega** todas as fontes detectadas no mesmo projeto; com mais
+  de uma, os slugs ganham **namespacing `fonte:slug`** (ex.: `speckit:001-x`,
+  `reversa:001-y`) — evita colisão de id/permalink/fingerprint. Com uma fonte só (caso
+  comum), comportamento idêntico a antes.
+
+### Infra
+- `buildArchHeuristic` exportado de `parse.mjs` para reuso por adapters.
+- Testes: 10 novos (54/54), incluindo fixture real (baseada nos templates oficiais) e
+  smoke test de coexistência SpecKit+Reversa.
+
 ## [0.8.0] — 2026-08-14
 
 **Renomeado: `speckit-graph` → `sdd-graph` (SDD-Graph).** O projeto deixa de ser
@@ -108,6 +140,7 @@ dependências de runtime, HTML self-contained.
 - Comando **`/speckit-graph`** instalável em Claude Code, GitHub Copilot (VS Code e CLI)
   e Kiro via `init`.
 
+[0.9.0]: https://github.com/CristianonCarvalho/sdd-graph/releases/tag/v0.9.0
 [0.8.0]: https://github.com/CristianonCarvalho/sdd-graph/releases/tag/v0.8.0
 [0.7.0]: https://github.com/CristianonCarvalho/sdd-graph/releases/tag/v0.7.0
 [0.6.0]: https://github.com/CristianonCarvalho/sdd-graph/releases/tag/v0.6.0

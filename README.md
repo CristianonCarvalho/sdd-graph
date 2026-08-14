@@ -1,8 +1,10 @@
 # sdd-graph
 
 **SDD-Graph** (antes `speckit-graph`) — diagramas interativos de projetos *Spec-Driven
-Development*. Hoje lê o [SpecKit](https://github.com/github/spec-kit); BMad e Reversa
-estão no roadmap (ver [`docs/plano-sdd-graph.md`](docs/plano-sdd-graph.md)).
+Development*. Lê [SpecKit](https://github.com/github/spec-kit) e o pipeline forward do
+[Reversa](https://github.com/sandeco/reversa) (`_reversa_forward/`); detecta a fonte
+automaticamente (ou `--adapter <nome>`); mais adapters no roadmap (ver
+[`docs/plano-sdd-graph.md`](docs/plano-sdd-graph.md)).
 Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
 ![Animação da aba de Dependências: o grafo em camadas revela as tasks coluna a coluna, com caminho crítico, formas por prioridade e painel de progresso](docs/img/demo.gif)
@@ -274,6 +276,24 @@ Via o adapter SpecKit (`src/adapters/speckit.mjs`) — outros adapters no roadma
 
 Nunca escreve nos arquivos de spec — apenas lê.
 
+## Como o parser entende o Reversa
+
+Via o adapter Reversa (`src/adapters/reversa.mjs`) — lê o pipeline **forward**
+(`_reversa_forward/<slug>/`), formato confirmado contra os templates reais do projeto.
+
+- `actions.md`: tasks `T001…` em tabela, por fase (`## Fase N, Nome`); `Dependências` por
+  vírgula; paralelismo = `` `[//]` ``; status = `` `[ ]` ``/`` `[X]` ``. Prioridade vem da
+  fase (Preparação→Setup, Polimento→Polish) ou é **herdada** do MoSCoW do RF citado na
+  descrição (Must→P1, Should→P2, Could→P3).
+- `requirements.md`: requisitos `RF-01…` (seção "Requisitos Funcionais") e personas
+  (seção "Personas e cenários de uso") viram casos de uso — sem vínculo formal a RF na
+  fonte, o Doctor sinaliza isso (`STORY_NO_FR`).
+- Arquitetura: heurística, a partir do "Arquivo alvo" real de cada ação.
+- Detecção automática (ou `--adapter reversa`); coexiste com SpecKit no mesmo projeto —
+  com mais de uma fonte, os slugs ganham prefixo (`speckit:…`, `reversa:…`).
+
+Nunca escreve nos arquivos do Reversa — apenas lê.
+
 ## Changelog
 
-Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.8.0**.
+Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.9.0**.

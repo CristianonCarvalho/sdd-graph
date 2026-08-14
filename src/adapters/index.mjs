@@ -4,8 +4,9 @@
 // houver mais de uma fonte, a agregação passa a namespacar os slugs como `fonte:slug`.
 import fs from 'node:fs';
 import speckit from './speckit.mjs';
+import reversa from './reversa.mjs';
 
-export const ADAPTERS = [speckit];
+export const ADAPTERS = [speckit, reversa];
 
 /** Adapters aplicáveis. Com --adapter, filtra por nome; senão, os que detectam o projeto. */
 export function resolveAdapters({ specsDir, adapter } = {}) {
@@ -22,15 +23,17 @@ export function resolveAdapters({ specsDir, adapter } = {}) {
 
 /**
  * Lê o projeto por todos os adapters aplicáveis e agrega as unidades no modelo canônico.
- * Fase 0: fonte única (SpecKit) → sem namespacing. Namespacing `fonte:slug` para
- * coexistência entra nas Fases 2–3 (B.9).
+ * Fonte única (caso comum) → slugs sem prefixo, comportamento idêntico ao de antes.
+ * Mais de uma fonte detectada (coexistência, B.9) → namespacing `fonte:slug`, para não
+ * colidir ids/permalink/fingerprint entre unidades de adapters diferentes.
  */
 export function parseProject({ specsDir, src, adapter } = {}) {
   const chosen = resolveAdapters({ specsDir, adapter });
+  const namespaced = chosen.length > 1;
   const out = {};
   for (const ad of chosen) {
     const units = ad.parse(specsDir, { src });
-    for (const [slug, unit] of Object.entries(units)) out[slug] = unit;
+    for (const [slug, unit] of Object.entries(units)) out[namespaced ? `${ad.name}:${slug}` : slug] = unit;
   }
   if (!Object.keys(out).length) {
     if (specsDir && !fs.existsSync(specsDir)) throw new Error(`Diretório não encontrado: ${specsDir}`);
