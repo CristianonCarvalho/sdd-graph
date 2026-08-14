@@ -136,6 +136,13 @@ Progresso: 25% → 50% (2/4, +1 concluída(s))
 
 O snapshot é um JSON pequeno (status/prioridade/deps/frs das tasks, achados por `fingerprint` e progresso) — o mesmo plano gera sempre os mesmos bytes.
 
+**Diff visual no HTML** — passe `--diff <base>` ao gerar o grafo para **sobrepor a evolução** na aba Dependências: cada nó ganha um marcador (🔵 nova · 🟢 concluída desde a base · 🟡 alterada) e um card lateral **"Diff do plano"** lista as mudanças (clicável para saltar ao nó). Toggle **🕒 diff** liga/desliga; o estado entra no permalink.
+
+```bash
+speckit-graph --diff HEAD~1 --open        # o que mudou desde o commit anterior
+speckit-graph --diff base.json --open     # desde um snapshot salvo
+```
+
 ## Comando /speckit-graph (Claude Code, GitHub Copilot e Kiro)
 
 Instale o comando `/speckit-graph` nas três ferramentas de IA de uma vez:

@@ -24,6 +24,8 @@
     --k-datastore:#5AC8FA; --k-config:#9AA0A6; --k-fr:#B7A0E0;
     /* diagnóstico (sobreposição): cor por severidade */
     --diag-error:#F5595F; --diag-warn:#F0B429; --diag-info:#5B8DEF;
+    /* diff (sobreposição): novo / concluído desde a base / alterado */
+    --diff-new:#5B8DEF; --diff-done:#35D07F; --diff-chg:#FFC766;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -113,6 +115,11 @@
   #detail .findings{margin-top:10px;border-top:1px solid var(--sg-card-border);padding-top:9px}
   #detail .findings .diagitem{padding:4px 0;cursor:default}
   #detail .findings .diagitem:hover{background:none}
+  /* v0.6.1 diff sobreposto: marcador no canto superior-esquerdo (não colide com o de diagnóstico) */
+  .diffdot{display:none;stroke:var(--sg-bg);stroke-width:1.5px;pointer-events:none}
+  body.diff-on .diffdot{display:inline}
+  #diffBase{font-size:11px;color:var(--sg-text-softer);margin-bottom:9px;font-family:'JetBrains Mono',monospace}
+  .diffmeta{font-size:11.5px;color:var(--sg-text-softer);padding:5px 8px}
   /* #15 foco: banner de saída */
   #focusBadge{background:var(--sg-icon-bg);border-color:var(--sg-icon-border);color:var(--sg-primary);font-weight:600}
   #focusBadge .x{margin-left:4px;font-weight:700}
@@ -143,6 +150,7 @@
     --k-external:#8C97A3; --k-model:#0072B2; --k-datastore:#56B4E9; --k-config:#9AA0A6; --k-fr:#CC79A7;
     --sg-primary:#D55E00; --sg-accent-2:#E69F00;
     --diag-error:#D55E00; --diag-warn:#E69F00; --diag-info:#0072B2;
+    --diff-new:#0072B2; --diff-done:#009E73; --diff-chg:#E69F00;
   }
   /* Tema claro / impressão */
   :root[data-theme="light"]{
@@ -179,6 +187,7 @@
       <span class="chip" id="pngBtn" title="baixar PNG desta visão">⬇ PNG</span>
       <span class="chip" id="svgBtn" title="baixar SVG desta visão">⬇ SVG</span>
       <span class="chip hide" id="focusBadge" title="sair do modo de foco">🎯 <span id="focusId"></span><span class="x">✕</span></span>
+      <span class="chip off hide" id="diffToggle" title="o que mudou desde a base (novo/concluído/alterado)"><span class="sw" style="background:var(--diff-done)"></span>diff</span>
       <span class="chip off" id="diagToggle"><span class="sw" style="background:var(--diag-warn)"></span>diagnóstico</span>
       <span class="chip" id="standupBtn" title="quadro kanban (o que está feito, em andamento, a fazer) — derivado do plano">📋 kanban</span>
       <span class="chip" id="critToggle"><span class="sw" style="background:var(--sg-primary)"></span>caminho crítico</span>
@@ -198,6 +207,7 @@
       <div class="card"><h3 id="statsTitle">Resumo</h3><div class="stats" id="stats"></div></div>
       <div class="card hide" id="progressCard"><h3>Progresso</h3><div class="pbar"><div class="pfill" id="pfill"></div></div><div class="pmeta" id="pmeta"></div><div class="pby" id="pby"></div></div>
       <div class="card hide" id="nextCard"><h3>Faça isto a seguir</h3><div id="nextList"></div></div>
+      <div class="card hide" id="diffCard"><h3>Diff do plano</h3><div id="diffBase"></div><div id="diffList"></div></div>
       <div class="card hide" id="diagCard"><h3>Diagnóstico do plano</h3><div class="diagcounts" id="diagCounts"></div><div id="diagList"></div></div>
       <div class="card"><h3 id="legTitle">Legenda</h3><div id="legend"></div><div class="legnote" id="legnote"></div></div>
       <div class="card" id="detail"><h3>Detalhe</h3><div class="empty">Clique num nó para ver os detalhes.</div></div>
@@ -228,7 +238,19 @@ const TABS = [
 ];
 const DIAG = { error:{c:'--diag-error',label:'erro'}, warn:{c:'--diag-warn',label:'aviso'}, info:{c:'--diag-info',label:'info'} };
 const SEVRANK = { error:0, warn:1, info:2 };
-const state = { spec:SPECS[0], tab:'deps', active:new Set(Object.keys(PRI)), crit:true, query:'', hideDone:false, diag:false, focus:null };
+const DIFFK = { done:{c:'--diff-done',label:'concluída desde a base'}, new:{c:'--diff-new',label:'nova'}, changed:{c:'--diff-chg',label:'alterada'} };
+const state = { spec:SPECS[0], tab:'deps', active:new Set(Object.keys(PRI)), crit:true, query:'', hideDone:false, diag:false, focus:null, showDiff:false };
+
+// v0.6.1 mapeia cada task a um tipo de mudança desde a base (só na aba Dependências)
+function diffFor(sp){
+  const dd=sp.diff; if(!dd) return null;
+  const m=new Map();
+  (dd.tasks.completed||[]).forEach(x=>m.set(x.id,'done'));
+  (dd.tasks.added||[]).forEach(x=>{ if(!m.has(x.id)) m.set(x.id,'new'); });
+  [...(dd.tasks.statusChanged||[]),...(dd.tasks.priorityChanged||[]),...(dd.tasks.depsChanged||[])].forEach(x=>{ if(!m.has(x.id)) m.set(x.id,'changed'); });
+  return m;
+}
+const anyDiff = SPECS.some(s=>!!DATA[s].diff);
 
 // #17 mapeia cada achado do Doctor ao nó correspondente na aba atual
 function diagFor(sp, tab){
@@ -397,6 +419,7 @@ function render(animate){
   clearInterval(pulseT);
   G=layout(buildFor(state.tab));
   const dg=diagFor(DATA[state.spec],state.tab); G.nodes.forEach(n=>{ n.diag=dg.get(n.id)||null; });
+  const dfm=state.tab==='deps'?diffFor(DATA[state.spec]):null; if(dfm) G.nodes.forEach(n=>{ n.diffKind=dfm.get(n.id)||null; });
   if(state.focus && !G._byId.has(state.focus)) state.focus=null;
   const extLabels = state.tab!=='deps';
   svg.selectAll('*').remove();
@@ -413,6 +436,8 @@ function render(animate){
   node.append('path').attr('class','sh').attr('d',d=>nodeShape(d)).attr('fill',d=>d.color);
   node.filter(d=>d.diag).append('circle').attr('class','diagdot').attr('cx',d=>d.r*.8).attr('cy',d=>-d.r*.8).attr('r',4.5)
     .attr('fill',d=>cssv(DIAG[d.diag.sev].c));
+  node.filter(d=>d.diffKind).append('circle').attr('class','diffdot').attr('cx',d=>-d.r*.8).attr('cy',d=>-d.r*.8).attr('r',4.5)
+    .attr('fill',d=>cssv(DIFFK[d.diffKind].c));
   node.append('title').text(d=>(d.name||(d._t&&d._t.label)||d.idText||d.id));
   node.filter(d=>d.idText).append('text').attr('class','id').text(d=>d.idText);
   if(extLabels) node.append('text').attr('class','ext').attr('x',d=>d.r+7).text(d=>trunc(d.name,22));
@@ -484,7 +509,8 @@ function showDetail(d){ const el=document.getElementById('detail');
   const chain=(d._up&&d._up.size)||(d._dn&&d._dn.size);
   const focusBtn=chain?`<div style="margin-top:11px"><span class="chip" id="focusBtn" style="cursor:pointer">${state.focus===d.id?'✕ sair do foco':'🎯 focar a cadeia'}</span></div>`:'';
   const fin=(d.diag&&d.diag.findings.length)?`<div class="findings"><div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--sg-text-softer);margin-bottom:6px">Diagnóstico</div>${d.diag.findings.map(f=>`<div class="diagitem"><span class="diagsev" style="background:${cssv(DIAG[f.severity].c)}"></span><span><span class="rid">${f.id}</span> · ${f.message}</span></div>`).join('')}</div>`:'';
-  el.innerHTML=`<h3>Detalhe</h3>${G.detail(d)}${focusBtn}${fin}`;
+  const dif=d.diffKind?`<div class="meta" style="margin-top:9px"><b>Desde a base:</b> <span style="color:${cssv(DIFFK[d.diffKind].c)}">${DIFFK[d.diffKind].label}</span></div>`:'';
+  el.innerHTML=`<h3>Detalhe</h3>${G.detail(d)}${dif}${focusBtn}${fin}`;
   el.querySelectorAll('code[data-id]').forEach(c=>c.onclick=ev=>{ev.stopPropagation();const n=G._byId.get(c.dataset.id);if(n){showDetail(n);hover(n);}});
   const fb=el.querySelector('#focusBtn'); if(fb) fb.onclick=ev=>{ev.stopPropagation(); toggleFocus(d.id);};
   state.sel=d.id; writeHash(); }
@@ -517,6 +543,25 @@ function buildDiag(sp){
   const list=document.getElementById('diagList');
   list.innerHTML=findings.map(f=>{ const nid=nidOf.get(f);
     return `<div class="diagitem"${nid?` data-nid="${nid}"`:''}><span class="diagsev" style="background:${cssv(DIAG[f.severity].c)}"></span><span><span class="rid">${f.id}</span> · ${f.message}</span></div>`; }).join('');
+  list.querySelectorAll('.diagitem[data-nid]').forEach(el=>el.onclick=()=>{const n=G._byId.get(el.dataset.nid);if(n){showDetail(n);hover(n);centerNode(n.id);}});
+}
+
+// ---------------- v0.6.1 diff sobreposto (card no aside) ----------------
+function buildDiffCard(sp){
+  const card=document.getElementById('diffCard'), dd=sp.diff;
+  if(!state.showDiff||!dd||state.tab!=='deps'){ card.classList.add('hide'); return; }
+  card.classList.remove('hide');
+  const p=dd.progress, pf=p.from.total?Math.round(p.from.done/p.from.total*100):0, pt=p.to.total?Math.round(p.to.done/p.to.total*100):0;
+  document.getElementById('diffBase').textContent=`base: ${dd.base||'—'} · progresso ${pf}% → ${pt}%`;
+  const df=diffFor(sp), ids=[...df.keys()].sort();
+  let html=ids.map(id=>{ const k=df.get(id), n=G._byId.get(id), lab=n?trunc(n.name||(n._t&&n._t.label)||'',30):'';
+    return `<div class="diagitem" data-nid="${id}"><span class="diagsev" style="background:${cssv(DIFFK[k].c)}"></span><span><span class="rid">${id}</span> ${lab} · ${DIFFK[k].label}</span></div>`; }).join('');
+  const rem=dd.tasks.removed||[];
+  if(rem.length) html+=`<div class="diagitem" style="opacity:.75;cursor:default"><span class="diagsev" style="background:${cssv('--k-external')}"></span><span>${rem.length} removida(s): ${rem.map(x=>x.id).join(', ')}</span></div>`;
+  const fa=dd.findings.appeared.length, fr=dd.findings.resolved.length;
+  if(fa||fr) html+=`<div class="diffmeta">achados desde a base: <b style="color:${cssv('--diag-error')}">+${fa}</b> / <b style="color:${cssv('--diag-info')}">−${fr}</b></div>`;
+  if(!ids.length&&!rem.length&&!fa&&!fr) html='<div class="diffmeta">Sem mudanças em relação à base.</div>';
+  const list=document.getElementById('diffList'); list.innerHTML=html;
   list.querySelectorAll('.diagitem[data-nid]').forEach(el=>el.onclick=()=>{const n=G._byId.get(el.dataset.nid);if(n){showDetail(n);hover(n);centerNode(n.id);}});
 }
 
@@ -562,6 +607,7 @@ function syncControls(){
   document.getElementById('critToggle').classList.toggle('hide',state.tab!=='deps');
   document.getElementById('doneToggle').classList.toggle('hide',state.tab!=='deps');
   document.getElementById('standupBtn').classList.toggle('hide',state.tab!=='deps');
+  document.getElementById('diffToggle').classList.toggle('hide',!(state.tab==='deps'&&!!DATA[state.spec].diff));
   document.getElementById('priBar').classList.toggle('hide',state.tab==='arch');
   syncFocusBadge();
   document.getElementById('progressCard').classList.toggle('hide',state.tab!=='deps');
@@ -621,6 +667,7 @@ function buildAside(){ const sp=DATA[state.spec];
       : 'Fluxo da esquerda (usuário) para a direita. Derivado das pastas e do plan.md — <b>heurístico</b> (código-fonte não encontrado).';
   }
   buildDiag(sp);
+  buildDiffCard(sp);
 }
 const stat=(n,l,c)=>`<div class="stat"><div class="n"${c?` style="color:${cssv(c)}"`:''}>${n}</div><div class="l">${l}</div></div>`;
 const legrow=(c,l,n)=>`<div class="legrow"><span class="sw" style="background:${c}"></span>${l}${n!==''?` <span style="margin-left:auto;color:var(--sg-text-softer)">${n}</span>`:''}</div>`;
@@ -633,7 +680,7 @@ function writeHash(){
   if(SPECS.length>1) p.push('spec='+state.spec);
   if(state.sel) p.push('sel='+state.sel);
   if(state.query) p.push('q='+encodeURIComponent(state.query));
-  const opt=[]; if(!state.crit)opt.push('nocrit'); if(state.hideDone)opt.push('hidedone'); if(state.diag)opt.push('diag'); if(opt.length)p.push('opt='+opt.join(','));
+  const opt=[]; if(!state.crit)opt.push('nocrit'); if(state.hideDone)opt.push('hidedone'); if(state.diag)opt.push('diag'); if(state.showDiff)opt.push('diff'); if(opt.length)p.push('opt='+opt.join(','));
   if(state.focus) p.push('focus='+state.focus);
   if(state.active.size<Object.keys(PRI).length) p.push('pri='+[...state.active].join(','));
   const h='#'+p.join('&');
@@ -645,7 +692,7 @@ function readHash(){
   if(q.tab&&TABS.some(t=>t.id===q.tab)) state.tab=q.tab;
   if(q.spec&&SPECS.includes(q.spec)) state.spec=q.spec;
   if(q.q!=null) state.query=decodeURIComponent(q.q);
-  if(q.opt){ const o=q.opt.split(','); state.crit=!o.includes('nocrit'); state.hideDone=o.includes('hidedone'); state.diag=o.includes('diag'); }
+  if(q.opt){ const o=q.opt.split(','); state.crit=!o.includes('nocrit'); state.hideDone=o.includes('hidedone'); state.diag=o.includes('diag'); state.showDiff=o.includes('diff'); }
   if(q.focus) state.focus=q.focus;
   if(q.pri) state.active=new Set(q.pri.split(',').filter(Boolean));
   return q.sel||null;
@@ -658,6 +705,8 @@ function syncUIToState(){
   document.getElementById('doneToggle').classList.toggle('off',state.hideDone);
   document.getElementById('diagToggle').classList.toggle('off',!state.diag);
   document.body.classList.toggle('diag-on',state.diag);
+  document.getElementById('diffToggle').classList.toggle('off',!state.showDiff);
+  document.body.classList.toggle('diff-on',state.showDiff);
   priBar.querySelectorAll('.pri-tog').forEach(t=>t.style.opacity=state.active.has(t.dataset.k)?1:.3);
 }
 
@@ -677,6 +726,7 @@ priBar.querySelectorAll('.pri-tog').forEach(t=>t.onclick=()=>{const k=t.dataset.
 document.getElementById('critToggle').onclick=function(){ state.crit=!state.crit; this.classList.toggle('off',!state.crit); applyFilter(); writeHash(); };
 document.getElementById('doneToggle').onclick=function(){ state.hideDone=!state.hideDone; this.classList.toggle('off',!state.hideDone); applyFilter(); writeHash(); };
 document.getElementById('diagToggle').onclick=function(){ state.diag=!state.diag; this.classList.toggle('off',!state.diag); document.body.classList.toggle('diag-on',state.diag); buildDiag(DATA[state.spec]); writeHash(); };
+document.getElementById('diffToggle').onclick=function(){ state.showDiff=!state.showDiff; this.classList.toggle('off',!state.showDiff); document.body.classList.toggle('diff-on',state.showDiff); buildDiffCard(DATA[state.spec]); writeHash(); };
 document.getElementById('standupBtn').onclick=openStandup;
 document.getElementById('focusBadge').onclick=()=>{ if(state.focus) toggleFocus(state.focus); };
 document.getElementById('search').oninput=e=>{state.query=e.target.value;matchIdx=0;applyFilter();updateSearch();writeHash();};

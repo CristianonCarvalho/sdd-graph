@@ -134,6 +134,19 @@ function cmdGenerate(flags) {
   const src = flags.src ? path.resolve(flags.src) : null; // escopo do código p/ arquitetura (monorepo)
 
   const data = parseSpecs(specsDir, { src });
+
+  // --diff <snapshot.json | git-ref>: embute o diff (novo/concluído/alterado) para a sobreposição visual
+  let diffLabel = null;
+  if (flags.diff) {
+    if (typeof flags.diff !== 'string') { console.error('✗ --diff: informe a base (ex.: --diff HEAD~1 ou --diff base.json)'); process.exit(2); }
+    const base = resolveBaseSnapshot(flags.diff, specsDir, src);
+    const rep = diffReport(base, buildSnapshot(data));
+    diffLabel = /\.json$/i.test(flags.diff) ? path.basename(flags.diff) : flags.diff;
+    for (const slug of Object.keys(data)) {
+      if (rep.specs[slug]) data[slug].diff = { base: diffLabel, ...rep.specs[slug] };
+    }
+  }
+
   const html = renderHTML(data, { project, selfContained });
   fs.writeFileSync(out, html);
 
@@ -146,6 +159,7 @@ function cmdGenerate(flags) {
   console.log(`✓ Grafo gerado: ${out}`);
   console.log(`  Specs (${specs.length}):\n${totals}`);
   if (src) console.log(`  Arquitetura escopada a: ${src}`);
+  if (diffLabel) console.log(`  Diff sobreposto vs. base: ${diffLabel}`);
   console.log(`  Modo: ${selfContained ? 'self-contained (offline)' : 'CDN'}`);
   if (flags.open) { openFile(out); console.log('  Abrindo no navegador…'); }
 }
@@ -255,6 +269,20 @@ function snapshotFromGitRef(ref, specsDir, src) {
   }
 }
 
+/** Resolve a base do diff: um snapshot .json salvo ou um git ref materializado. */
+function resolveBaseSnapshot(fromArg, specsDir, src) {
+  const asFile = path.resolve(fromArg);
+  if (/\.json$/i.test(fromArg) || fs.existsSync(asFile)) {
+    let j;
+    try { j = JSON.parse(fs.readFileSync(asFile, 'utf8')); }
+    catch { console.error(`✗ não consegui ler o snapshot: ${asFile}`); process.exit(2); }
+    if (j && j.kind === 'snapshot' && j.specs) return j;
+    console.error('✗ arquivo não é um snapshot do speckit-graph (gere com `speckit-graph snapshot`).');
+    process.exit(2);
+  }
+  return snapshotFromGitRef(fromArg, specsDir, src);
+}
+
 function cmdDiff(args) {
   const flags = args.flags;
   const specsDir = findSpecsDir(flags.specs);
@@ -267,19 +295,7 @@ function cmdDiff(args) {
     process.exit(2);
   }
   const to = buildSnapshot(parseSpecs(specsDir, { src }));
-
-  let from;
-  const asFile = path.resolve(fromArg);
-  if (/\.json$/i.test(fromArg) || fs.existsSync(asFile)) {
-    let j;
-    try { j = JSON.parse(fs.readFileSync(asFile, 'utf8')); }
-    catch { console.error(`✗ não consegui ler o snapshot: ${asFile}`); process.exit(2); }
-    if (j && j.kind === 'snapshot' && j.specs) from = j;
-    else { console.error('✗ arquivo não é um snapshot do speckit-graph (gere com `speckit-graph snapshot`).'); process.exit(2); }
-  } else {
-    from = snapshotFromGitRef(fromArg, specsDir, src);
-  }
-
+  const from = resolveBaseSnapshot(fromArg, specsDir, src);
   const rep = diffReport(from, to);
   const project = flags.project || deriveProjectName(specsDir);
   const wantJson = 'json' in flags;
@@ -311,6 +327,8 @@ function main() {
     --cdn           usa D3 via CDN em vez de embutir (arquivo menor, precisa de internet)
     --open          abre o HTML no navegador ao terminar
     --doctor        imprime o diagnóstico do plano (ciclos, FR órfã, tasks soltas…)
+    --diff <base>   sobrepõe no grafo o que mudou desde a base (git-ref ou snapshot.json):
+                    novo/concluído/alterado, com card lateral (toggle 🕒 diff)
 
   speckit-graph doctor [--specs <dir>] [--src <dir>] [--strict]
     diagnóstico determinístico do plano; --strict sai com código ≠0 se houver erro
