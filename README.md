@@ -3,7 +3,7 @@
 Diagramas interativos dos artefatos do [SpecKit](https://github.com/github/spec-kit).
 Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
-![Aba de Dependências: grafo em camadas das tasks, com caminho crítico animado, formas por prioridade e painel de progresso](docs/img/deps.png)
+![Animação da aba de Dependências: o grafo em camadas revela as tasks coluna a coluna, com caminho crítico, formas por prioridade e painel de progresso](docs/img/demo.gif)
 
 - **Dependências** — grafo dirigido em camadas das tasks (layout com redução de cruzamentos por barycenter; grafos grandes, a partir de 400 nós, usam **Sugiyama completo** — dummies + minimização por mediana + arestas roteadas pelas camadas): cor = prioridade (P1/P2/P3, Setup, Fundação, Polish), tamanho = quão bloqueante, **caminho crítico** animado. Barra de **progresso** (geral e por prioridade, lida dos checkboxes `- [x]`) e painel **"faça isto a seguir"** com as tasks já desbloqueadas (todas as dependências concluídas); concluídas ganham anel verde, prontas ganham anel âmbar. Botão **📋 kanban** abre um quadro read-only (derivado do plano, nunca editável) com quatro colunas — concluídas · **em andamento** (`- [~]`) · prontas p/ começar · **bloqueadas** (calculadas pelas dependências) — bom para a daily.
 - **Casos de uso** — ator → casos de uso (user stories do `spec.md`, cor por prioridade) → requisitos (FR) que cada um cobre.
