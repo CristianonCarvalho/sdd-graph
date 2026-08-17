@@ -394,6 +394,23 @@ Cada fase é independente e testável isoladamente (padrão que já usamos: núc
     isso implica?
 11. **Autoridade de arquitetura** quando várias fontes descrevem o mesmo código:
     `reversa(native) > from-code > heurístico` é a ordem desejada?
+12. **Superpowers** (`obra/superpowers`) — estudado a pedido (17/08/2026). Não é uma
+    ferramenta SDD que gera specs/tasks como SpecKit/BMad/Reversa; é um *framework de
+    skills* que dirige o próprio agente de codificação (brainstorming → plano → dev
+    orientado a subagentes → TDD → code review), instalável como plugin do Claude Code.
+    Duas leituras avaliadas:
+    - **Como adapter** (visualizar planos do Superpowers no SDD-Graph): planos ficam em
+      `docs/superpowers/plans/YYYY-MM-DD-<feature>.md` com header semi-fixo e tasks em
+      checkbox, mas sem requirements com ID (FR/AC/RF) e sem spec com template
+      confirmado — mesmo problema já levantado para o AI-DLC (`docs/aidlc.md`): contrato
+      fraco demais para um parser confiável agora. **Não implementar.**
+    - **Como metodologia de desenvolvimento do próprio SDD-Graph**: sobrepõe a **Parte E**
+      já adotada aqui (`plano-sdd-graph.md` como spec-mestre + subagente
+      `revisor-sdd-graph` a cada etapa ≈ `requesting-code-review` do Superpowers). Adotar
+      trocaria a customização fina do `revisor-sdd-graph` (invariantes específicas deste
+      repo: determinismo, zero-deps, `--sg-` intacto, namespacing `fonte:slug`) por um
+      processo genérico mantido por terceiros. **Não adotado agora**; fica em aberto para
+      um piloto futuro em branch/worktree isolado, sem mexer no fluxo atual.
 
 ---
 
