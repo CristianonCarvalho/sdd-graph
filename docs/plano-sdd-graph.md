@@ -292,6 +292,40 @@ por nós — **recomendada**, mantém 100% dos princípios do projeto; (2) adapt
 best-effort sem grafo de dependências confiável — fallback; (3) extração assistida por
 LLM em tempo de geração — fora de escopo (quebraria zero-deps/determinismo como padrão).
 
+## B.6.2 Adapter **tlc-spec-driven** (catálogo tech-leads-club/agent-skills)
+
+> ✅ **Implementado** (`src/adapters/tlc.mjs`, Fase 3b — fora da ordem original do
+> roadmap, como o Reversa: formato confirmado direto no `SKILL.md`/`references/specify.md`/
+> `references/tasks.md` da skill (não a descrição do README), mesma exigência de
+> "confirmar verbatim" adotada desde o episódio do BMad.
+
+Avaliado junto com o Superpowers (ver Parte D, item 12) como possível fonte de dados, mas
+com um contrato bem mais forte: a skill embute scripts Python (`validate_spec.py`,
+`validate_tasks.py`) que **validam a estrutura por código**, não só por convenção de
+prompt — o mesmo tipo de garantia que faltou no AI-DLC (B.6.1) e no próprio Superpowers.
+
+**Escopo desta versão:** só `.specs/features/<feature>/spec.md` (user stories P1/P2/P3 +
+tabela de *Requirement Traceability*) e `tasks.md` (task breakdown + execution plan).
+Ficam de fora: `design.md`/`context.md`/`validation.md` (texto livre, só existem em
+escopo Large/Complex, sem template fixo) e `.specs/STATE.md` (log de decisões a nível de
+projeto, não de unidade — não cabe no modelo por-unidade atual). Arquitetura usa o
+heurístico existente (`buildArchHeuristic`), alimentado pelo campo **Where** de cada task.
+
+**Decisões de mapeamento (a parte que não é 1:1 óbvio):**
+- **Prioridade da task:** as fases do tlc (`Foundation`, `Core Implementation`...) são só
+  organizacionais, sem sentido de prioridade (diferente do Reversa). A prioridade real
+  vem de `**Requirement**: [ID]` na task → busca esse id na tabela de traceability do
+  `spec.md` → coluna Story (`P1: <título>`) → prioridade `P1`/`P2`/`P3`. Task sem
+  `Requirement` fica `null` — honesto, mesmo padrão do Reversa para fases sem prioridade.
+- **Texto do requisito (`frText`):** o template não liga cada critério EARS a um id de
+  requisito individual — só a tabela de traceability liga `id → Story`. `frText[id]` usa a
+  frase da User Story correspondente, não o AC (limitação documentada no código-fonte).
+- **Status da task:** não há checkbox na própria task, só no checklist `**Done when**:`.
+  `done` = todos os itens marcados `[x]`; `inProgress` = pelo menos um marcado, não todos.
+
+**Capabilities (como implementado):** `{ deps: true, stories: true, requirements: 'ID',
+architecture: 'heuristic' }`.
+
 ## B.7 Impacto por módulo do núcleo
 
 | Módulo | Impacto |
@@ -358,6 +392,7 @@ ferramentas diferentes, cada uma com **badge da fonte**.
 | **1** | **Renomeação → SDD-Graph** (Parte A), com aliases e *deprecation* | **0.8.0** ✅ | Não (com aliases) |
 | **2** | ~~Adapter BMad~~ **adiada** — v6.11.0 restructurou PRD/epics/stories pra um contrato novo (`stories.yaml`) 5 dias antes desta etapa; o formato documentado (docs/stories/\*.md) está em shim de compatibilidade a caminho da remoção na v7. Retomar quando estabilizar ou houver um projeto real pra validar contra. | — | — |
 | **3** | **Adapter Reversa** — **adiantada** (ordem invertida: formato confirmado por template real, ao contrário do BMad). Escopo: só o pipeline **forward** (tasks + requisitos); reverse/arquitetura nativa fica para depois (ver B.6). | **0.9.0** ✅ | Não |
+| **3b** | **Adapter tlc-spec-driven** (tech-leads-club/agent-skills) — fora da ordem original, mesmo motivo do Reversa: contrato confirmado verbatim na skill (inclusive validado por scripts próprios da skill). Escopo: `spec.md` + `tasks.md`; `design.md`/`context.md`/`validation.md`/`STATE.md` ficam para depois (ver B.6.2). | **0.10.0** ✅ | Não |
 | **4** | Generalização do Doctor por *capabilities* + novas abas (ERD/API/fluxos); retomar BMad; arquitetura nativa do Reversa | 1.0.0 | Não |
 
 **Lição da Fase 2→3:** antes de codar um parser contra um formato de terceiros, confirme
@@ -411,6 +446,10 @@ Cada fase é independente e testável isoladamente (padrão que já usamos: núc
       repo: determinismo, zero-deps, `--sg-` intacto, namespacing `fonte:slug`) por um
       processo genérico mantido por terceiros. **Não adotado agora**; fica em aberto para
       um piloto futuro em branch/worktree isolado, sem mexer no fluxo atual.
+    - **Contraste:** a mesma pergunta feita sobre `tech-leads-club/agent-skills` levou a um
+      resultado diferente — a skill `tlc-spec-driven` desse catálogo **virou adapter**
+      (ver B.6.2), porque tem contrato validado por código (scripts da própria skill), não
+      só convenção de prompt como o Superpowers.
 
 ---
 

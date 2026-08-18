@@ -5,8 +5,9 @@
 import fs from 'node:fs';
 import speckit from './speckit.mjs';
 import reversa from './reversa.mjs';
+import tlc from './tlc.mjs';
 
-export const ADAPTERS = [speckit, reversa];
+export const ADAPTERS = [speckit, reversa, tlc];
 
 /** Adapters aplicáveis. Com --adapter, filtra por nome; senão, os que detectam o projeto. */
 export function resolveAdapters({ specsDir, adapter } = {}) {

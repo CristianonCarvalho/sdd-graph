@@ -441,7 +441,7 @@ function main() {
     --specs <dir>   diretório de specs (default: ./specs autodetectado)
     --src <dir>     pasta de código p/ a aba Arquitetura (default: <raiz>/src)
                     use em monorepo p/ escopar só à feature (ex.: src/modulos/pedidos/consulta)
-    --adapter <n>   força o adapter SDD (default: autodetecta). Hoje: speckit
+    --adapter <n>   força o adapter SDD (default: autodetecta). Hoje: speckit, reversa, tlc
     --out <arquivo> saída (default: ./sdd-graph.html)
     --project <nome> nome exibido no cabeçalho
     --cdn           usa D3 via CDN em vez de embutir (arquivo menor, precisa de internet)

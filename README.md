@@ -1,9 +1,10 @@
 # sdd-graph
 
 **SDD-Graph** (antes `speckit-graph`) — diagramas interativos de projetos *Spec-Driven
-Development*. Lê [SpecKit](https://github.com/github/spec-kit) e o pipeline forward do
-[Reversa](https://github.com/sandeco/reversa) (`_reversa_forward/`); detecta a fonte
-automaticamente (ou `--adapter <nome>`); mais adapters no roadmap (ver
+Development*. Lê [SpecKit](https://github.com/github/spec-kit), o pipeline forward do
+[Reversa](https://github.com/sandeco/reversa) (`_reversa_forward/`) e a skill
+[tlc-spec-driven](https://github.com/tech-leads-club/agent-skills) (`.specs/features/`);
+detecta a fonte automaticamente (ou `--adapter <nome>`); mais adapters no roadmap (ver
 [`docs/plano-sdd-graph.md`](docs/plano-sdd-graph.md)).
 Lê `specs/*/` de um projeto e gera **um HTML self-contained com 3 abas**:
 
@@ -57,7 +58,7 @@ sdd-graph [opções]
   --specs <dir>     diretório de specs (default: ./specs autodetectado)
   --src <dir>       pasta de código p/ a aba Arquitetura (default: <raiz>/src);
                     em monorepo, aponte só à feature (ex.: src/modulos/pedidos/consulta)
-  --adapter <nome>  força o adapter SDD (default: autodetecta). Hoje: speckit
+  --adapter <nome>  força o adapter SDD (default: autodetecta). Hoje: speckit, reversa, tlc
   --out <arquivo>   saída (default: ./sdd-graph.html)
   --project <nome>  nome exibido no cabeçalho
   --cdn             usa D3 via CDN (arquivo menor, precisa de internet)
@@ -294,6 +295,25 @@ Via o adapter Reversa (`src/adapters/reversa.mjs`) — lê o pipeline **forward*
 
 Nunca escreve nos arquivos do Reversa — apenas lê.
 
+## Como o parser entende o tlc-spec-driven
+
+Via o adapter `tlc` (`src/adapters/tlc.mjs`) — lê `.specs/features/<feature>/{spec.md,
+tasks.md}`, formato confirmado direto na skill (não só no README do catálogo).
+
+- `spec.md`: user stories `P1`/`P2`/`P3` (seção "User Stories") e a tabela **Requirement
+  Traceability** (`Requirement ID → Story`) viram casos de uso e requisitos.
+- `tasks.md`: tasks `T1…` com `**Depends on**`, `**Requirement**` e checklist `**Done
+  when**:` (`[x]` = concluído; parcialmente marcado = em andamento). Prioridade e story
+  vêm do `Requirement` citado — as fases (`Foundation`, `Core Implementation`...) são só
+  organizacionais aqui, ao contrário do Reversa.
+- Arquitetura: heurística, a partir do campo **Where** de cada task.
+- `design.md`/`context.md`/`validation.md`/`.specs/STATE.md` ainda não são lidos (ver
+  `docs/plano-sdd-graph.md` B.6.2).
+- Detecção automática (ou `--adapter tlc`); coexiste com SpecKit/Reversa no mesmo
+  projeto — com mais de uma fonte, os slugs ganham prefixo (`speckit:…`, `tlc:…`).
+
+Nunca escreve nos arquivos do tlc-spec-driven — apenas lê.
+
 ## Changelog
 
-Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.9.0**.
+Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.10.0**.

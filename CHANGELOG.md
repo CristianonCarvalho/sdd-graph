@@ -4,6 +4,34 @@ Todas as mudanças relevantes deste projeto. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.10.0] — 2026-08-18
+
+**Terceiro adapter SDD: tlc-spec-driven** (catálogo tech-leads-club/agent-skills) — fora
+da ordem original do roadmap, mesmo critério do Reversa: formato confirmado **verbatim**
+direto no `SKILL.md`/`references/specify.md`/`references/tasks.md` da skill, que ainda por
+cima valida a própria estrutura por código (`validate_spec.py`, `validate_tasks.py`).
+
+### Adapter tlc-spec-driven (`src/adapters/tlc.mjs`)
+- Lê `.specs/features/<feature>/spec.md` (user stories `P1`/`P2`/`P3`, tabela de
+  *Requirement Traceability*) e `tasks.md` (task breakdown, `**Depends on**`,
+  `**Requirement**`, checklist `**Done when**`).
+- Prioridade e story da task vêm do **Requirement** citado (busca na tabela de
+  traceability), não da fase — as fases do tlc são só organizacionais, diferente do
+  Reversa. Task sem `Requirement` fica com prioridade/story `null` (honesto).
+- Status: `done` quando todo o checklist "Done when" está `[x]`; `inProgress` quando só
+  parte está.
+- Arquitetura via heurístico existente, alimentada pelo campo "Where" de cada task.
+- Escopo desta versão: só `spec.md` + `tasks.md`. `design.md`/`context.md`/
+  `validation.md`/`.specs/STATE.md` ficam de fora (texto livre ou nível de projeto, não de
+  unidade) — ver `docs/plano-sdd-graph.md` B.6.2.
+- **Reusa 100% do núcleo sem código novo**: Doctor, índice de confiança, gate, diff,
+  timeline e o HTML funcionam sem alteração.
+
+### Infra
+- Testes: 10 novos (64/64), incluindo fixture realista (moldada nos templates reais da
+  skill) e verificação de que Doctor/confiança/arquitetura funcionam para a 3ª fonte sem
+  mudança em `doctor.mjs`/`confidence.mjs`/`parse.mjs`.
+
 ## [0.9.0] — 2026-08-14
 
 **Segundo adapter SDD: Reversa** (github.com/sandeco/reversa) — ordem do roadmap
