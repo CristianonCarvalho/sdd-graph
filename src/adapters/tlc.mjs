@@ -123,7 +123,12 @@ function parseSpecMd(text) {
       let usecase = usecases.find(u => `${u.priority}: ${u.title}` === storyCell);
       if (!usecase) {
         const pm = storyCell.match(/^P([1-3])/);
-        if (pm) usecase = usecases.find(u => u.priority === 'P' + pm[1]);
+        if (pm) {
+          const candidates = usecases.filter(u => u.priority === 'P' + pm[1]);
+          // só usa o fallback por prioridade quando é inequívoco — com 2+ stories na mesma
+          // prioridade, adivinhar qual delas seria inventar um vínculo que a fonte não deu.
+          if (candidates.length === 1) usecase = candidates[0];
+        }
       }
       storyByReqId[id] = usecase ? usecase.id : null;
       frPriority[id] = usecase ? usecase.priority : null;
@@ -186,12 +191,11 @@ function parseTasksMd(text, { frPriority, storyByReqId }) {
     const doneIdx = block.findIndex(l => /\*\*Done when\*\*:/i.test(l));
     const doneItems = [];
     if (doneIdx >= 0) {
-      let i = doneIdx + 1;
-      while (i < block.length && /^\s*$/.test(block[i])) i++; // pula linha(s) em branco após o marcador
-      for (; i < block.length; i++) {
+      // Coleta itens `- [ ]`/`- [x]` até a próxima linha "**Campo**:" (fim do checklist) —
+      // tolera linhas em branco entre itens (comum em Markdown gerado por LLM/editor).
+      for (let i = doneIdx + 1; i < block.length && !/^\*\*[^*]+\*\*:/.test(block[i]); i++) {
         const cm = block[i].match(/^-\s*\[([ xX])\]/);
-        if (!cm) break;
-        doneItems.push(cm[1].toLowerCase() === 'x');
+        if (cm) doneItems.push(cm[1].toLowerCase() === 'x');
       }
     }
     const done = doneItems.length > 0 && doneItems.every(Boolean);

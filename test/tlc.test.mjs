@@ -94,3 +94,28 @@ test('arquitetura heurística lê o campo "Where" das tasks (src/…)', () => {
 test('parseProject é determinístico', () => {
   assert.equal(JSON.stringify(parseProject({ specsDir: SPECS })), JSON.stringify(parseProject({ specsDir: SPECS })));
 });
+
+test('checklist "Done when" com linha em branco entre itens não marca done cedo demais', () => {
+  const spec = `# X\n\n## User Stories\n\n### P1: A\n\n**User Story**: As a user, I want a so that b.\n\n**Acceptance Criteria**:\n\n1. The system SHALL do a\n`;
+  const tasks = `# X Tasks\n\n## Task Breakdown\n\n### T1: Do thing\n\n**Where**: `+'`src/services/x.ts`'+`\n**Depends on**: None\n\n**Done when**:\n\n- [x] item one\n\n- [ ] item two\n\n**Tests**: none\n**Gate**: build\n`;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-tlc-checklist-'));
+  const featDir = path.join(dir, '.specs', 'features', 'x');
+  fs.mkdirSync(featDir, { recursive: true });
+  fs.writeFileSync(path.join(featDir, 'spec.md'), spec);
+  fs.writeFileSync(path.join(featDir, 'tasks.md'), tasks);
+  const out = tlc.parse(path.join(dir, 'specs'));
+  assert.equal(out.x.tasks[0].done, false);
+  assert.equal(out.x.tasks[0].inProgress, true);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('Requirement Traceability com prioridade ambígua (2 stories mesma prioridade) não adivinha a story', () => {
+  const spec = `# X\n\n## User Stories\n\n### P1: Alpha\n\n**User Story**: As a user, I want alpha so that a.\n\n### P1: Beta\n\n**User Story**: As a user, I want beta so that b.\n\n## Requirement Traceability\n\n| Requirement ID | Story | Phase | Status |\n| --- | --- | --- | --- |\n| X-01 | P1 | Design | Pending |\n`;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-tlc-ambig-'));
+  const featDir = path.join(dir, '.specs', 'features', 'x');
+  fs.mkdirSync(featDir, { recursive: true });
+  fs.writeFileSync(path.join(featDir, 'spec.md'), spec);
+  const out = tlc.parse(path.join(dir, 'specs'));
+  assert.equal(out.x.frText['X-01'], 'P1'); // sem match inequívoco, guarda o texto cru da célula
+  fs.rmSync(dir, { recursive: true, force: true });
+});
