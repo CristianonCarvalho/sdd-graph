@@ -272,7 +272,12 @@ Via o adapter SpecKit (`src/adapters/speckit.mjs`) — outros adapters no roadma
 - Fases (`## Phase N: ...`) definem a user story e a prioridade (`Priority: P1`).
 - Fases sem story viram `SETUP` / `FOUND` (Foundational) / `POLISH`.
 - Tasks: `- [ ] T001 [P] descrição...` → `[X]` = concluída, `[~]` = em andamento, `[P]` = paralelizável.
-- Dependências: qualquer `depende de T003`, ranges `T008–T013` e listas `T020, T031`.
+- Dependências: `depende de T003`/`depends on T003` (PT/EN), ranges `T008–T013` e listas
+  `T020, T031`, quando a task declara. **Quando não declara** (comum — a geração oficial do
+  spec-kit nunca exige essa anotação), infere pela estrutura: 1ª task de cada fase (e
+  qualquer task `[P]`) recebe todas as tasks da fase anterior como dependência; as demais
+  encadeiam na task anterior do arquivo. Marcada como inferida na confiança (crédito
+  parcial), nunca sobrescreve uma dependência declarada.
 - Requisitos: qualquer `FR-XXX` citado na descrição.
 
 Nunca escreve nos arquivos de spec — apenas lê.
@@ -316,4 +321,4 @@ Nunca escreve nos arquivos do tlc-spec-driven — apenas lê.
 
 ## Changelog
 
-Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.10.0**.
+Histórico de versões em [`CHANGELOG.md`](CHANGELOG.md). Versão atual: **0.10.1**.

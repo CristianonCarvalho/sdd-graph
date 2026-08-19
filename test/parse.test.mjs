@@ -15,6 +15,11 @@ test('parseTaskDeps: ids soltos, listas e ranges (com dedup)', () => {
   assert.deepEqual(parseTaskDeps('sem dep'), []);
 });
 
+test('parseTaskDeps: bilíngue — "depends on"/"depend on" (EN, formato oficial do spec-kit)', () => {
+  assert.deepEqual(parseTaskDeps('foo (depends on T012, T013)'), ['T012', 'T013']);
+  assert.deepEqual(parseTaskDeps('bar (depend on T001)'), ['T001']);
+});
+
 test('parseTasksFile: extrai id, done, prioridade, story, deps e depsRaw', () => {
   const tasks = parseTasksFile(path.join(SPECS, '001-clean', 'tasks.md'));
   const byId = Object.fromEntries(tasks.map(t => [t.id, t]));
@@ -53,6 +58,49 @@ test('parseTasksFile: [~] marca task em andamento (nem done, nem aberta)', () =>
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('parseTasksFile: infere deps por fase/[P] quando não há anotação inline (formato oficial do spec-kit)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-infer-'));
+  const f = path.join(dir, 'tasks.md');
+  fs.writeFileSync(f, [
+    '## Phase 1: Setup',
+    '- [ ] T001 primeira tarefa',
+    '- [ ] T002 [P] segunda tarefa',
+    '- [ ] T003 [P] terceira tarefa',
+    '## Phase 2: Foundational',
+    '- [ ] T004 quarta tarefa',
+    '- [ ] T005 [P] quinta tarefa',
+    '- [ ] T006 sexta tarefa',
+    '## Phase 3: User Story 1 - X (Priority: P1)',
+    '- [ ] T007 [US1] setima tarefa',
+    '- [ ] T008 [P] [US1] oitava tarefa',
+    '- [ ] T009 [US1] nona tarefa (depends on T001)',
+  ].join('\n'));
+  const byId = Object.fromEntries(parseTasksFile(f).map(t => [t.id, t]));
+
+  // Fase 1: sem fase anterior => raiz, nada inferido (bate com "Setup: no dependencies")
+  assert.deepEqual(byId.T001.deps, []);
+  assert.equal(byId.T001.depsInferred, false);
+  assert.deepEqual(byId.T002.deps, []); // [P], mas fase 1 não tem fase anterior
+  assert.deepEqual(byId.T003.deps, []);
+
+  // Fase 2: 1ª task e as [P] pegam fan-in completo na fase 1 inteira (gate de fase)
+  assert.deepEqual(byId.T004.deps.sort(), ['T001', 'T002', 'T003']);
+  assert.equal(byId.T004.depsInferred, true);
+  assert.deepEqual(byId.T005.deps.sort(), ['T001', 'T002', 'T003']); // [P], não é a 1ª
+  // não-[P], não-1ª da fase: encadeia só na task anterior do arquivo
+  assert.deepEqual(byId.T006.deps, ['T005']);
+  assert.equal(byId.T006.depsInferred, true);
+
+  // Fase 3: mesmo padrão, gate completo na fase 2 inteira
+  assert.deepEqual(byId.T007.deps.sort(), ['T004', 'T005', 'T006']);
+  assert.deepEqual(byId.T008.deps.sort(), ['T004', 'T005', 'T006']);
+
+  // Dependência explícita nunca é sobrescrita pela inferência
+  assert.deepEqual(byId.T009.deps, ['T001']);
+  assert.equal(byId.T009.depsInferred, false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('parseTasksFile: tolera CRLF (\\r\\n) — arquivo editado no Windows', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-crlf-'));
   const f = path.join(dir, 'tasks.md');
@@ -85,6 +133,19 @@ test('parseSpecMd: tolera CRLF (\\r\\n) no spec.md', () => {
   assert.equal(spec.usecases.length, 1);
   assert.equal(spec.usecases[0].actor, 'usuário');
   assert.deepEqual(Object.keys(spec.frText), ['FR-001']);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('parseSpecMd: bilíngue — "As a X," (EN) além de "Como X," (PT)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-actor-'));
+  fs.writeFileSync(path.join(dir, 'spec.md'), [
+    '### User Story 1 - Login (Priority: P1)',
+    'As a user, I want to sign in.',
+    '',
+    '- **FR-001**: Must validate credentials',
+  ].join('\n'));
+  const spec = parseSpecMd(dir);
+  assert.equal(spec.usecases[0].actor, 'user');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

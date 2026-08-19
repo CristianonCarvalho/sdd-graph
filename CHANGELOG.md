@@ -4,6 +4,35 @@ Todas as mudanças relevantes deste projeto. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.10.1] — 2026-08-19
+
+**Robustez do adapter SpecKit contra o formato oficial atual e CRLF.** Dois problemas reais
+reportados pelo usuário, confirmados contra a fonte oficial (`github/spec-kit`) e contra
+arquivos reais gerados por ele.
+
+### CRLF (Windows) quebrava o parser silenciosamente
+- `readText()` (novo, `src/parse.mjs`, exportado) normaliza `\r\n`/`\r` → `\n` antes de
+  qualquer parsing — regexes ancoradas em `$` sem `\s*` antes exigiam fim de linha exato e
+  falhavam mudas com `\r` residual (`tasks.md` inteiro virava 0 tasks, sem erro).
+  Aplicado em toda leitura de `tasks.md`/`spec.md`/`plan.md` e nos scanners de
+  código-fonte (Python/Java/JS/Go); `reversa.mjs`/`tlc.mjs` passam a reusar o mesmo helper.
+
+### Grafo "vertical sem dependências" — anotação inline nunca foi exigida pelo spec-kit
+- Confirmado ao vivo contra `templates/tasks-template.md` e `templates/commands/tasks.md`
+  do `github/spec-kit`: a anotação `(depends on Txxx)` por task **nunca foi um requisito**
+  da geração oficial — só decoração de um exemplo. A ordenação real e estável é
+  estrutural: fases sempre sequenciais + marcador `[P]` ("no dependencies on incomplete
+  tasks"). `parseTasksFile` agora infere a dependência quando a task não declara nenhuma
+  (1ª task/`[P]` de cada fase ganha gate completo na fase anterior; as demais encadeiam na
+  task anterior do arquivo) — nunca sobrescreve deps explícitas.
+- Cada aresta inferida é marcada (`depsInferred`) e recebe crédito parcial (0.7) no índice
+  de confiança (`src/confidence.mjs`), mesmo tratamento já dado a imports relativos —
+  honesto, não finge certeza que a fonte não deu.
+- `parseTaskDeps` bilíngue: reconhece `depends on`/`depend on` (EN) além de `depende de`
+  (PT) — o próprio exemplo oficial usa inglês. `parseSpecMd` idem para extração de ator
+  (`As a/an X,` além de `Como X,`).
+- Testes: 5 novos (73/73).
+
 ## [0.10.0] — 2026-08-18
 
 **Terceiro adapter SDD: tlc-spec-driven** (catálogo tech-leads-club/agent-skills) — fora

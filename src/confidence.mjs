@@ -21,7 +21,16 @@ function ratio(good, bad) {
  */
 export function computeConfidence(p) {
   const rTask = p.taskLines ? ratio(p.taskLines.exact, p.taskLines.unmatched) : null;
-  const rDep = p.depEdges ? ratio(p.depEdges.resolved, p.depEdges.unresolved) : null;
+  // dep: aresta declarada pela fonte vale cheio; inferida (fase/[P], sem anotação inline —
+  // ver src/parse.mjs) vale crédito parcial (0.7), mesmo tratamento dos imports relativos
+  // abaixo. Quando `inferred` está ausente/0 (todo o resto do código hoje), reduz à mesma
+  // ratio() de sempre — retrocompatível.
+  let rDep = null;
+  if (p.depEdges) {
+    const { resolved = 0, unresolved = 0, inferred = 0 } = p.depEdges;
+    const total = resolved + unresolved;
+    if (total > 0) rDep = ((resolved - inferred) + 0.7 * inferred) / total;
+  }
   let rArch = null;
   if (p.arch) rArch = p.arch.source ? (p.arch.baseAmbiguous ? 0.75 : 1) : 0.5;
   // inferido (import relativo resolvido) vale crédito parcial; não-resolvido conta contra

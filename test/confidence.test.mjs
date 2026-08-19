@@ -26,6 +26,16 @@ test('dimensão ausente é redistribuída (não penaliza)', () => {
   assert.deepEqual(Object.keys(r.dims), ['task']);
 });
 
+test('dep inferida (fase/[P], sem anotação inline) tem crédito parcial (0.7)', () => {
+  const r = computeConfidence({ depEdges: { resolved: 10, unresolved: 0, inferred: 10 } });
+  assert.equal(r.dims.dep, 70);
+});
+
+test('dep: quando inferred está ausente, mantém a ratio de sempre (retrocompatível)', () => {
+  const r = computeConfidence({ depEdges: { resolved: 5, unresolved: 0 } });
+  assert.equal(r.dims.dep, 100);
+});
+
 test('import inferido (relativo) tem crédito parcial (0.7)', () => {
   const r = computeConfidence({ imports: { exact: 0, inferred: 10, unresolved: 0 } });
   assert.equal(r.dims.import, 70);

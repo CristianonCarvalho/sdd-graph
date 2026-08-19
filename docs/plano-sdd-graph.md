@@ -188,6 +188,37 @@ export default {
 - **Risco:** baixíssimo — é reempacotamento; a suíte de testes atual passa a validar o
   adapter SpecKit.
 
+## B.4.1 Robustez do SpecKit contra o formato oficial atual
+
+> ✅ **Implementado** (v0.10.1). Achado a partir de um `tasks.md` real do usuário: o parser
+> original confiava em anotação inline `(depende de Txxx)` por task, mas confirmado ao vivo
+> contra a fonte oficial (`github/spec-kit`: `templates/tasks-template.md` +
+> `templates/commands/tasks.md`) que **essa anotação nunca foi exigida** pela geração —
+> só o formato `- [ ] [ID] [P?] [Story?] Description` é obrigatório. A fonte real e estável
+> de ordenação é estrutural: fases sempre sequenciais ("Foundational... BLOCKS all user
+> stories", texto padrão presente em todo `tasks.md` gerado) e o marcador `[P]`, definido
+> oficialmente como "no dependencies on incomplete tasks".
+
+**Fix:** `parseTasksFile` (`src/parse.mjs`) agora infere dependência quando a task não
+declara nenhuma: 1ª task de cada fase (e qualquer task `[P]`) recebe **todas** as tasks da
+fase anterior como dep (gate completo, bate com "BLOCKS ALL"); task não-`[P]` no meio da
+fase encadeia só na task anterior do arquivo. Deps explícitas nunca são sobrescritas. Cada
+aresta inferida é marcada (`depsInferred: true`) e recebe **crédito parcial (0.7)** no
+índice de confiança (`src/confidence.mjs`, mesmo tratamento já dado a imports relativos) —
+honesto: não finge que é tão confiável quanto uma dependência declarada pela fonte.
+
+Bilíngue também: `parseTaskDeps` passa a reconhecer `depends on`/`depend on` (EN) além de
+`depende de` (PT) — o próprio exemplo do template oficial usa inglês; e `parseSpecMd`
+tenta `As a/an X,` além de `Como X,` na extração de ator (a spec real do usuário nem usa
+um desses padrões — cai no genérico `'Ator'`, degradação já existente, sem quebrar).
+
+**Gap de cobertura confirmado, não implementado agora:** o spec-kit atual também gera
+`## Clarifications` dentro do `spec.md` (Q&A do `/speckit-clarify`) e `checklists/*.md`
+(checklist de qualidade do `/speckit-checklist`) — artefatos novos que o adapter SpecKit
+ainda não lê. `data-model.md`/`contracts/`/`research.md`/`quickstart.md` também não são
+lidos. Mesmo espírito do `_reversa_sdd/` não lido pelo Reversa (ver B.6): registrado, fica
+para um incremento futuro se valer a pena.
+
 ## B.5 Adapter **BMad** (BMAD-METHOD)
 
 **Artefatos** (padrão v4/v5): `docs/prd.md`, `docs/architecture.md`, `docs/epics/*.md`,

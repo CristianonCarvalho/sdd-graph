@@ -13,10 +13,11 @@ export function readText(file) {
   return fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
 }
 
-/** Extrai todas as dependências (ids Txxx) declaradas via "depende de ..." num rótulo. */
+/** Extrai todas as dependências (ids Txxx) declaradas via "depende de ..."/"depends on ..."
+ *  num rótulo (PT + EN — o próprio exemplo oficial do spec-kit usa "depends on"). */
 export function parseTaskDeps(label) {
   const deps = new Set();
-  const re = /depende de ([^.)\n]*)/gi;      // pode haver mais de um trecho
+  const re = /(?:depende de|depends?\s+on)\s+([^.)\n]*)/gi;      // pode haver mais de um trecho
   let m;
   while ((m = re.exec(label)) !== null) {
     const chunk = m[1];
@@ -43,6 +44,13 @@ export function parseTasksFile(file) {
   const lines = raw.split('\n');
   const nodes = [];
   let curPhase = null, curStory = null, curPriority = null, curPhaseIdx = 0;
+  // Inferência de dependência quando a task não declara nenhuma explicitamente (comum: a
+  // geração oficial do spec-kit NUNCA exige anotação inline "(depends on Txxx)" — só o
+  // formato "- [ ] [ID] [P?] [Story?] Description" é obrigatório). A fonte real e estável
+  // de ordenação é estrutural: fases sempre sequenciais ("Foundational... BLOCKS all user
+  // stories", texto padrão gerado em todo tasks.md) e o marcador [P], definido oficialmente
+  // como "no dependencies on incomplete tasks". Ver docs/plano-sdd-graph.md.
+  let curPhaseTaskIds = [], prevPhaseTaskIds = [];
 
   const phaseRe = /^##\s+Phase\s+(\d+):\s+(.+)$/;
   const storyRe = /User Story\s+(\d+)\s*-\s*(.+?)\s*\(Priority:\s*(P\d)\)/;
@@ -51,6 +59,8 @@ export function parseTasksFile(file) {
   for (const line of lines) {
     const pm = line.match(phaseRe);
     if (pm) {
+      prevPhaseTaskIds = curPhaseTaskIds;
+      curPhaseTaskIds = [];
       curPhaseIdx = parseInt(pm[1], 10);
       const title = pm[2];
       const sm = title.match(storyRe);
@@ -72,8 +82,26 @@ export function parseTasksFile(file) {
       const rest = tm[3];
       const parallel = /^\[P\]/.test(rest);
       let label = rest.replace(/^\[P\]\s*/, '').replace(/^\[US\d+\]\s*/, '');
+      const id = tm[2];
+      let deps = parseTaskDeps(rest);
+      let depsInferred = false;
+      if (!deps.length) {
+        // 1ª task da fase (ou [P], que nunca depende de irmãs da própria fase): gate
+        // completo na fase anterior inteira — garante que o painel "próximo a fazer"/
+        // kanban (que checa deps.every(d=>doneSet.has(d))) só libere quando ela terminar
+        // de verdade, batendo com "BLOCKS all user stories" do próprio spec-kit.
+        if (!curPhaseTaskIds.length || parallel) {
+          deps = [...prevPhaseTaskIds];
+        } else {
+          // não-[P], não-1ª da fase: encadeia na task anterior do arquivo (barato; a
+          // garantia da fase já veio via a 1ª task, herdada transitivamente pelo `done`).
+          const prev = nodes[nodes.length - 1];
+          if (prev) deps = [prev.id];
+        }
+        if (deps.length) depsInferred = true;
+      }
       nodes.push({
-        id: tm[2],
+        id,
         label: label.trim(),
         phase: curPhase,
         phaseIdx: curPhaseIdx,
@@ -82,9 +110,11 @@ export function parseTasksFile(file) {
         done: tm[1].toLowerCase() === 'x',
         inProgress: tm[1] === '~',
         parallel,
-        deps: parseTaskDeps(rest),
+        deps,
+        depsInferred,
         frs: [...new Set(rest.match(/FR-\d+[a-z]?/g) || [])],
       });
+      curPhaseTaskIds.push(id);
     }
   }
   // guarda as deps cruas (para o Doctor detectar DEP_UNKNOWN/SELF_DEP) e
@@ -110,7 +140,10 @@ export function parseSpecMd(specDir) {
         const t = lines[j].trim();
         if (t) { body = t; break; }
       }
-      const am = body.match(/^Como\s+([^,]+),/i);
+      // PT ("Como X,") + EN ("As a/an X,") — o template oficial não exige nenhum padrão de
+      // frase fixo, então prosa totalmente livre (comum em specs reais) cai no genérico
+      // 'Ator' mesmo com os dois padrões; extrair de prosa livre exigiria NLP, fora de escopo.
+      const am = body.match(/^(?:Como|As an?)\s+([^,]+),/i);
       const actor = am ? am[1].trim() : 'Ator';
       actors.add(actor);
       usecases.push({ id: 'US' + m[1], title: m[2].trim(), priority: m[3], actor, desc: body });
@@ -431,13 +464,14 @@ export function parseSpecs(specsDir, opts = {}) {
     // proveniência p/ o índice de confiança
     const ids = new Set(tasks.map(t => t.id));
     const checkboxLines = (readText(tasksFile).match(/^\s*-\s*\[[ xX~]\]/gm) || []).length;
-    let resolved = 0, unresolved = 0;
+    let resolved = 0, unresolved = 0, inferred = 0;
     tasks.forEach(t => (t.depsRaw || []).forEach(d => {
-      if (ids.has(d) && d !== t.id) resolved++; else unresolved++;
+      if (ids.has(d) && d !== t.id) { resolved++; if (t.depsInferred) inferred++; }
+      else unresolved++;
     }));
     const provenance = {
       taskLines: { exact: tasks.length, unmatched: Math.max(0, checkboxLines - tasks.length) },
-      depEdges: { resolved, unresolved },
+      depEdges: { resolved, unresolved, inferred },
       arch: { source: !!rec.arch.source, baseAmbiguous: !!rec.arch.baseAmbiguous },
       imports: rec.arch.provenance ? rec.arch.provenance.imports : null,
     };
