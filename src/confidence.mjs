@@ -16,7 +16,9 @@ function ratio(good, bad) {
 }
 
 /**
- * @param {object} p provenance: { taskLines:{exact,unmatched}, depEdges:{resolved,unresolved}, arch:{source,baseAmbiguous} }
+ * @param {object} p provenance: { taskLines:{exact,unmatched}, depEdges:{resolved,unresolved,inferred?}, arch:{source,baseAmbiguous} }
+ *   depEdges.inferred (opcional): quantas das `resolved` são inferidas (não declaradas
+ *   pela fonte — ver src/parse.mjs). Pré-condição do chamador: inferred <= resolved.
  * @returns {{index:number|null, dims:object}}
  */
 export function computeConfidence(p) {
@@ -28,8 +30,9 @@ export function computeConfidence(p) {
   let rDep = null;
   if (p.depEdges) {
     const { resolved = 0, unresolved = 0, inferred = 0 } = p.depEdges;
+    const inf = Math.min(Math.max(inferred, 0), resolved); // defensivo: nunca > resolved
     const total = resolved + unresolved;
-    if (total > 0) rDep = ((resolved - inferred) + 0.7 * inferred) / total;
+    if (total > 0) rDep = ((resolved - inf) + 0.7 * inf) / total;
   }
   let rArch = null;
   if (p.arch) rArch = p.arch.source ? (p.arch.baseAmbiguous ? 0.75 : 1) : 0.5;

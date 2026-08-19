@@ -31,7 +31,12 @@ arquivos reais gerados por ele.
 - `parseTaskDeps` bilíngue: reconhece `depends on`/`depend on` (EN) além de `depende de`
   (PT) — o próprio exemplo oficial usa inglês. `parseSpecMd` idem para extração de ator
   (`As a/an X,` além de `Como X,`).
-- Testes: 5 novos (73/73).
+- **Casos-limite corrigidos após revisão** (`revisor-sdd-graph`): fase sem tasks entre dois
+  headings não apagava mais a cadeia de fan-in para a fase seguinte; dependência explícita
+  "pra frente" (cruzando fases) podia fazer a inferência inventar um `CYCLE` falso — agora
+  excluída do fan-in/encadeamento de quem ela cita. `computeConfidence` ganhou uma trava
+  defensiva (`inferred` nunca conta mais que `resolved`).
+- Testes: 7 novos (75/75).
 
 ## [0.10.0] — 2026-08-18
 

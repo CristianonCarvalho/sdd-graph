@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseTaskDeps, parseTasksFile, parseSpecMd, parseSpecs } from '../src/parse.mjs';
+import { runDoctor } from '../src/doctor.mjs';
 
 const SPECS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'proj', 'specs');
 
@@ -98,6 +99,42 @@ test('parseTasksFile: infere deps por fase/[P] quando não há anotação inline
   // Dependência explícita nunca é sobrescrita pela inferência
   assert.deepEqual(byId.T009.deps, ['T001']);
   assert.equal(byId.T009.depsInferred, false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('parseTasksFile: fase vazia não apaga a cadeia de fan-in (achado do revisor-sdd-graph)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-emptyphase-'));
+  const f = path.join(dir, 'tasks.md');
+  fs.writeFileSync(f, [
+    '## Phase 1: Setup',
+    '- [ ] T001 primeira tarefa',
+    '- [ ] T002 segunda tarefa',
+    '## Phase 2: Empty phase (sem tasks)',
+    '## Phase 3: Foundational',
+    '- [ ] T003 terceira tarefa',
+  ].join('\n'));
+  const byId = Object.fromEntries(parseTasksFile(f).map(t => [t.id, t]));
+  // Fase 2 não tem tasks — a cadeia da Fase 3 tem que pular direto pra Fase 1, não ficar vazia
+  assert.deepEqual(byId.T003.deps.sort(), ['T001', 'T002']);
+  assert.equal(byId.T003.depsInferred, true);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('parseTasksFile: dep explícita apontando pra frente (cruzando fase) não gera CYCLE falso via inferência (achado do revisor-sdd-graph)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-fwddep-'));
+  const f = path.join(dir, 'tasks.md');
+  fs.writeFileSync(f, [
+    '## Phase 1: Setup',
+    '- [ ] T001 primeira tarefa (depends on T002)',
+    '## Phase 2: Foundational',
+    '- [ ] T002 segunda tarefa',
+  ].join('\n'));
+  const nodes = parseTasksFile(f);
+  const byId = Object.fromEntries(nodes.map(t => [t.id, t]));
+  assert.deepEqual(byId.T001.deps, ['T002']); // declarada, intacta
+  assert.deepEqual(byId.T002.deps, []); // não herda fan-in de quem já depende dela — sem ciclo
+  const ids = runDoctor({ tasks: nodes, usecases: [], frText: {}, arch: { nodes: [] } }).findings.map(x => x.id);
+  assert.ok(!ids.includes('CYCLE'), 'inferência não pode inventar um ciclo que a fonte não tem');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

@@ -59,7 +59,9 @@ export function parseTasksFile(file) {
   for (const line of lines) {
     const pm = line.match(phaseRe);
     if (pm) {
-      prevPhaseTaskIds = curPhaseTaskIds;
+      // fase sem nenhuma task (heading seguido direto de outro heading) não apaga a
+      // cadeia — mantém prevPhaseTaskIds da última fase que realmente teve tasks.
+      if (curPhaseTaskIds.length) prevPhaseTaskIds = curPhaseTaskIds;
       curPhaseTaskIds = [];
       curPhaseIdx = parseInt(pm[1], 10);
       const title = pm[2];
@@ -85,18 +87,27 @@ export function parseTasksFile(file) {
       const id = tm[2];
       let deps = parseTaskDeps(rest);
       let depsInferred = false;
+      // Task com QUALQUER dependência explícita (mesmo parcial) nunca ganha inferência
+      // adicional — se o autor listou "depende de T003" e não mais nada, respeita que a
+      // lista é o que ele quis declarar; não tentamos "completar" por baixo.
       if (!deps.length) {
+        // Uma task já emitida que declarou explicitamente depender de `id` não pode
+        // entrar no fan-in/encadeamento inferido — geraria um CYCLE que não existe na
+        // fonte (a task "anterior" no arquivo pode ter uma dep explícita apontando pra
+        // frente, cruzando fases). Como todo candidato já foi processado (nodes só cresce
+        // pra frente), a checagem é local e barata.
+        const isBackEdge = cand => { const c = nodes.find(n => n.id === cand); return !!c && c.deps.includes(id); };
         // 1ª task da fase (ou [P], que nunca depende de irmãs da própria fase): gate
         // completo na fase anterior inteira — garante que o painel "próximo a fazer"/
         // kanban (que checa deps.every(d=>doneSet.has(d))) só libere quando ela terminar
         // de verdade, batendo com "BLOCKS all user stories" do próprio spec-kit.
         if (!curPhaseTaskIds.length || parallel) {
-          deps = [...prevPhaseTaskIds];
+          deps = prevPhaseTaskIds.filter(d => !isBackEdge(d));
         } else {
           // não-[P], não-1ª da fase: encadeia na task anterior do arquivo (barato; a
           // garantia da fase já veio via a 1ª task, herdada transitivamente pelo `done`).
           const prev = nodes[nodes.length - 1];
-          if (prev) deps = [prev.id];
+          if (prev && !isBackEdge(prev.id)) deps = [prev.id];
         }
         if (deps.length) depsInferred = true;
       }

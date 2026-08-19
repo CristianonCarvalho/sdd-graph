@@ -200,12 +200,21 @@ export default {
 > oficialmente como "no dependencies on incomplete tasks".
 
 **Fix:** `parseTasksFile` (`src/parse.mjs`) agora infere dependência quando a task não
-declara nenhuma: 1ª task de cada fase (e qualquer task `[P]`) recebe **todas** as tasks da
-fase anterior como dep (gate completo, bate com "BLOCKS ALL"); task não-`[P]` no meio da
-fase encadeia só na task anterior do arquivo. Deps explícitas nunca são sobrescritas. Cada
-aresta inferida é marcada (`depsInferred: true`) e recebe **crédito parcial (0.7)** no
-índice de confiança (`src/confidence.mjs`, mesmo tratamento já dado a imports relativos) —
-honesto: não finge que é tão confiável quanto uma dependência declarada pela fonte.
+declara **nenhuma** (dep parcial explícita nunca ganha inferência adicional — respeita a
+lista que o autor decidiu declarar): 1ª task de cada fase (e qualquer task `[P]`) recebe
+**todas** as tasks da fase anterior como dep (gate completo, bate com "BLOCKS ALL"); task
+não-`[P]` no meio da fase encadeia só na task anterior do arquivo. Deps explícitas nunca
+são sobrescritas. Cada aresta inferida é marcada (`depsInferred: true`) e recebe **crédito
+parcial (0.7)** no índice de confiança (`src/confidence.mjs`, mesmo tratamento já dado a
+imports relativos) — honesto: não finge que é tão confiável quanto uma dependência
+declarada pela fonte.
+
+**Casos-limite cobertos (achados do `revisor-sdd-graph` na primeira versão do fix):**
+fase sem nenhuma task entre dois headings não apaga a cadeia (a fase seguinte herda o
+fan-in da última fase que teve tasks, não uma lista vazia); e uma dependência explícita
+"pra frente" (task cedo no arquivo citando `depends on` uma task de fase posterior) é
+excluída do fan-in/encadeamento inferido de quem ela cita — sem isso, a inferência podia
+inventar um `CYCLE` que a fonte não tem. Ambos com teste de regressão.
 
 Bilíngue também: `parseTaskDeps` passa a reconhecer `depends on`/`depend on` (EN) além de
 `depende de` (PT) — o próprio exemplo do template oficial usa inglês; e `parseSpecMd`
