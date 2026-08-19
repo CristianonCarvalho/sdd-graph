@@ -5,6 +5,14 @@ import path from 'node:path';
 import { runDoctor } from './doctor.mjs';
 import { computeConfidence } from './confidence.mjs';
 
+/** Lê um arquivo de texto normalizando quebras de linha (CRLF/CR → LF) antes do parsing.
+ *  Várias regexes abaixo (e nos adapters) ancoram em `$` sem `\s*` antes — um `\r`
+ *  residual (arquivo criado/editado no Windows) faz esse casamento falhar em silêncio.
+ *  Exportada para reuso por outros adapters (mesmo motivo de buildArchHeuristic). */
+export function readText(file) {
+  return fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
+}
+
 /** Extrai todas as dependências (ids Txxx) declaradas via "depende de ..." num rótulo. */
 export function parseTaskDeps(label) {
   const deps = new Set();
@@ -31,7 +39,7 @@ export function parseTaskDeps(label) {
 
 /** Faz o parse de um único tasks.md e retorna a lista de nós. */
 export function parseTasksFile(file) {
-  const raw = fs.readFileSync(file, 'utf8');
+  const raw = readText(file);
   const lines = raw.split('\n');
   const nodes = [];
   let curPhase = null, curStory = null, curPriority = null, curPhaseIdx = 0;
@@ -90,7 +98,7 @@ export function parseTasksFile(file) {
 export function parseSpecMd(specDir) {
   const f = path.join(specDir, 'spec.md');
   if (!fs.existsSync(f)) return { usecases: [], actors: [], frText: {} };
-  const lines = fs.readFileSync(f, 'utf8').split('\n');
+  const lines = readText(f).split('\n');
   const usecases = [], frText = {}, actors = new Set();
   const ucRe = /^###\s+User Story\s+(\d+)\s*-\s*(.+?)\s*\(Priority:\s*(P\d)\)/;
   const frRe = /^-\s+\*\*(FR-\d+[a-z]?)\*\*:\s*(.+)$/;
@@ -116,7 +124,7 @@ export function parseSpecMd(specDir) {
 
 function planFields(specDir) {
   const planFile = path.join(specDir, 'plan.md');
-  const plan = fs.existsSync(planFile) ? fs.readFileSync(planFile, 'utf8') : '';
+  const plan = fs.existsSync(planFile) ? readText(planFile) : '';
   const field = re => { const m = plan.match(re); return m ? m[1].trim() : ''; };
   return {
     storage: field(/\*\*Storage\*\*:\s*([^\n(]+)/),
@@ -159,7 +167,7 @@ function scanPythonSource(srcDir) {
   const out = files.map(abs => {
     const parts = path.relative(srcDir, abs).replace(/\.py$/, '').split(path.sep);
     const dirParts = parts.slice(0, -1);
-    const text = fs.readFileSync(abs, 'utf8');
+    const text = readText(abs);
     const imports = [];
     let m;
     // absolutos: from src.a.b … / import src.a.b  (proveniência exata)
@@ -185,7 +193,7 @@ function scanJavaSource(srcRoot) {
   const files = walkFiles(srcRoot, '.java').filter(f => !/(package|module)-info\.java$/.test(f));
   if (!files.length) return null;
   const parsed = files.map(abs => {
-    const text = fs.readFileSync(abs, 'utf8');
+    const text = readText(abs);
     const pkg = (text.match(/^\s*package\s+([\w.]+)\s*;/m) || [])[1] || '';
     const imports = [];
     const re = /^\s*import\s+(?:static\s+)?([\w.]+)\s*;/gm;
@@ -238,7 +246,7 @@ export function scanJsSource(srcDir) {
   const out = files.map(abs => {
     const parts = path.relative(srcDir, abs).replace(/\.(tsx?|jsx?|mjs|cjs)$/, '').split(path.sep);
     const dirParts = parts.slice(0, -1);
-    const text = fs.readFileSync(abs, 'utf8');
+    const text = readText(abs);
     const specs = [];
     let m;
     const patterns = [
@@ -264,7 +272,7 @@ function findGoModule(dir) {
   let d = dir;
   for (let i = 0; i < 6; i++) {
     const f = path.join(d, 'go.mod');
-    if (fs.existsSync(f)) { const m = fs.readFileSync(f, 'utf8').match(/^\s*module\s+(\S+)/m); return m ? m[1] : null; }
+    if (fs.existsSync(f)) { const m = readText(f).match(/^\s*module\s+(\S+)/m); return m ? m[1] : null; }
     const up = path.dirname(d); if (up === d) break; d = up;
   }
   return null;
@@ -279,7 +287,7 @@ export function scanGoSource(srcDir) {
   const out = files.map(abs => {
     const parts = path.relative(srcDir, abs).replace(/\.go$/, '').split(path.sep);
     const layer = dropContainers(parts.slice(0, -1));
-    const text = fs.readFileSync(abs, 'utf8');
+    const text = readText(abs);
     const paths = [];
     (text.match(/import\s*\(([\s\S]*?)\)/g) || []).forEach(b => { let mm; const re = /"([^"]+)"/g; while ((mm = re.exec(b)) !== null) paths.push(mm[1]); });
     (text.match(/^\s*import\s+(?:[\w.]+\s+)?"([^"]+)"/gm) || []).forEach(s => { const mm = s.match(/"([^"]+)"/); if (mm) paths.push(mm[1]); });
@@ -422,7 +430,7 @@ export function parseSpecs(specsDir, opts = {}) {
 
     // proveniência p/ o índice de confiança
     const ids = new Set(tasks.map(t => t.id));
-    const checkboxLines = (fs.readFileSync(tasksFile, 'utf8').match(/^\s*-\s*\[[ xX~]\]/gm) || []).length;
+    const checkboxLines = (readText(tasksFile).match(/^\s*-\s*\[[ xX~]\]/gm) || []).length;
     let resolved = 0, unresolved = 0;
     tasks.forEach(t => (t.depsRaw || []).forEach(d => {
       if (ids.has(d) && d !== t.id) resolved++; else unresolved++;

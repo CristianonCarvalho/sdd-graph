@@ -20,7 +20,7 @@
 // que a fonte realmente oferece, em vez de inventar granularidade que ela não tem.
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildArchHeuristic } from '../parse.mjs';
+import { buildArchHeuristic, readText } from '../parse.mjs';
 import { runDoctor } from '../doctor.mjs';
 import { computeConfidence } from '../confidence.mjs';
 
@@ -220,11 +220,11 @@ function parseTasksMd(text, { frPriority, storyByReqId }) {
 
 /** Lê e normaliza uma única .specs/features/<feature>/ → Unit (mesmo shape do SpecKit/Reversa). */
 function parseUnit(dir) {
-  const { usecases, frText, frPriority, storyByReqId } = parseSpecMd(fs.readFileSync(path.join(dir, 'spec.md'), 'utf8'));
+  const { usecases, frText, frPriority, storyByReqId } = parseSpecMd(readText(path.join(dir, 'spec.md')));
 
   const tasksFile = path.join(dir, 'tasks.md');
   const tasks = fs.existsSync(tasksFile)
-    ? parseTasksMd(fs.readFileSync(tasksFile, 'utf8'), { frPriority, storyByReqId })
+    ? parseTasksMd(readText(tasksFile), { frPriority, storyByReqId })
     : []; // escopo Small/Medium: tasks ficam implícitas no chat, nunca tocam disco
 
   const archTasks = tasks.map(t => ({ label: `${t.label} ${t.targetFile || ''}` }));

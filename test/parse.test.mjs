@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseTaskDeps, parseTasksFile, parseSpecs } from '../src/parse.mjs';
+import { parseTaskDeps, parseTasksFile, parseSpecMd, parseSpecs } from '../src/parse.mjs';
 
 const SPECS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'proj', 'specs');
 
@@ -50,6 +50,41 @@ test('parseTasksFile: [~] marca task em andamento (nem done, nem aberta)', () =>
   assert.equal(byId.T002.inProgress, true);
   assert.equal(byId.T003.done, false);
   assert.equal(byId.T003.inProgress, false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('parseTasksFile: tolera CRLF (\\r\\n) — arquivo editado no Windows', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-crlf-'));
+  const f = path.join(dir, 'tasks.md');
+  fs.writeFileSync(f, [
+    '## Phase 1: Setup',
+    '- [X] T001 feita',
+    '## Phase 2: User Story 1 - Login (Priority: P1)',
+    '- [ ] T002 [P] faz algo (FR-001)',
+  ].join('\r\n'));
+  const byId = Object.fromEntries(parseTasksFile(f).map(t => [t.id, t]));
+  assert.equal(Object.keys(byId).length, 2, 'CRLF não pode zerar o parsing de tasks');
+  assert.equal(byId.T001.done, true);
+  assert.equal(byId.T001.priority, 'SETUP');
+  assert.equal(byId.T002.priority, 'P1');
+  assert.equal(byId.T002.story, 'US1');
+  assert.equal(byId.T002.parallel, true);
+  assert.deepEqual(byId.T002.frs, ['FR-001']);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('parseSpecMd: tolera CRLF (\\r\\n) no spec.md', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-crlf-'));
+  fs.writeFileSync(path.join(dir, 'spec.md'), [
+    '### User Story 1 - Login (Priority: P1)',
+    'Como usuário, quero entrar no sistema.',
+    '',
+    '- **FR-001**: Deve validar credenciais',
+  ].join('\r\n'));
+  const spec = parseSpecMd(dir);
+  assert.equal(spec.usecases.length, 1);
+  assert.equal(spec.usecases[0].actor, 'usuário');
+  assert.deepEqual(Object.keys(spec.frText), ['FR-001']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

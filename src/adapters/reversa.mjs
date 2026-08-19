@@ -14,7 +14,7 @@
 // já existente, alimentado pelo caminho real de "Arquivo alvo" de cada ação.
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildArchHeuristic } from '../parse.mjs';
+import { buildArchHeuristic, readText } from '../parse.mjs';
 import { runDoctor } from '../doctor.mjs';
 import { computeConfidence } from '../confidence.mjs';
 
@@ -159,9 +159,9 @@ function parseRequirementsMd(text) {
 
 /** Lê e normaliza um único _reversa_forward/<slug>/ → Unit (mesmo shape do SpecKit). */
 function parseUnit(dir) {
-  const tasks = parseActionsMd(fs.readFileSync(path.join(dir, 'actions.md'), 'utf8'));
+  const tasks = parseActionsMd(readText(path.join(dir, 'actions.md')));
   const reqFile = path.join(dir, 'requirements.md');
-  const req = fs.existsSync(reqFile) ? parseRequirementsMd(fs.readFileSync(reqFile, 'utf8')) : { frText: {}, frPriority: {}, usecases: [], actors: [] };
+  const req = fs.existsSync(reqFile) ? parseRequirementsMd(readText(reqFile)) : { frText: {}, frPriority: {}, usecases: [], actors: [] };
   // requisitos citados numa task herdam prioridade MoSCoW se a task não tiver uma própria
   tasks.forEach(t => { if (!t.priority && t.frs.length) { const p = t.frs.map(f => req.frPriority[f]).find(Boolean); if (p) t.priority = p; } });
 
