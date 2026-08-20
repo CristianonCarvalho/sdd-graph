@@ -434,6 +434,7 @@ ferramentas diferentes, cada uma com **badge da fonte**.
 | **3** | **Adapter Reversa** — **adiantada** (ordem invertida: formato confirmado por template real, ao contrário do BMad). Escopo: só o pipeline **forward** (tasks + requisitos); reverse/arquitetura nativa fica para depois (ver B.6). | **0.9.0** ✅ | Não |
 | **3b** | **Adapter tlc-spec-driven** (tech-leads-club/agent-skills) — fora da ordem original, mesmo motivo do Reversa: contrato confirmado verbatim na skill (inclusive validado por scripts próprios da skill). Escopo: `spec.md` + `tasks.md`; `design.md`/`context.md`/`validation.md`/`STATE.md` ficam para depois (ver B.6.2). | **0.10.0** ✅ | Não |
 | **4** | Generalização do Doctor por *capabilities* + novas abas (ERD/API/fluxos); retomar BMad; arquitetura nativa do Reversa | 1.0.0 | Não |
+| — | **Polimento de UI incremental** (`src/template.html`) — fora do roadmap de adapters, versões patch conforme surgem (ex.: card flutuante no hover em 0.10.2, robustez de parsing do SpecKit em 0.10.1). Rastreado no `CHANGELOG.md`; registrado aqui só como nota de que essas versões existem e não quebram nada da arquitetura de adapters. | 0.10.x | Não |
 
 **Lição da Fase 2→3:** antes de codar um parser contra um formato de terceiros, confirme
 a estrutura **verbatim** (template/exemplo real), não a descrição de uma busca. Isso

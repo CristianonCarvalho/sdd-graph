@@ -24,6 +24,21 @@ de" — informação que o próprio destaque da cadeia no hover já comunica vis
   exportação PNG/SVG (`serializeSVG()` clona só o `<svg>`, o card é um `<div>` externo).
 - Clique continua abrindo o painel completo na aside, sem mudança de comportamento.
 
+**Correções após revisão** (`revisor-sdd-graph`):
+- **Nome acessível restaurado**: remover o `<title>` nativo, sem substituto, era regressão
+  de acessibilidade (leitor de tela deixava de anunciar o nó, inclusive em touch — onde o
+  card novo é propositalmente escondido). Nós ganham `aria-label`/`role="img"` — não
+  dispara o tooltip nativo do navegador (diferente do `<title>`), então o card continua
+  sendo a única apresentação visual.
+- **Overflow de conteúdo**: nas abas Casos de uso/Arquitetura o hover mostra `G.detail()`
+  completo (sem modo compacto) — texto de FR/descrição pode ser longo. `.hovertip` ganhou
+  `max-height` calculado a partir da `.stage` disponível (não só da janela) + `overflow-y:
+  auto`, evitando estourar por baixo da área do grafo em janelas baixas.
+- `max-width` responsivo (`min(280px,90vw)`) para o caso raro de `.stage` mais estreita
+  que o card.
+- `applyFilter()` (busca/prioridade/foco) agora esconde o card de hover — evita mostrar
+  detalhe completo de um nó que acabou de ser esmaecido pelo filtro.
+
 ## [0.10.1] — 2026-08-19
 
 **Robustez do adapter SpecKit contra o formato oficial atual e CRLF.** Dois problemas reais

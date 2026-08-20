@@ -97,7 +97,7 @@
   .frtag{display:inline-block;background:var(--sg-icon-bg);border:1px solid var(--sg-icon-border);color:var(--sg-primary);font-size:10px;font-weight:600;padding:1px 7px;border-radius:6px;margin:2px 4px 2px 0}
   /* tooltip de hover: mesmo cartão visual do #detail (classe .detail-card), flutuante e
      sem interação própria — só aparece/some com o hover do nó, nunca captura o mouse. */
-  .hovertip{position:fixed;z-index:50;max-width:280px;pointer-events:none;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+  .hovertip{position:fixed;z-index:50;max-width:min(280px,90vw);overflow-y:auto;pointer-events:none;box-shadow:0 14px 40px rgba(0,0,0,.35)}
   @media (hover:none),(pointer:coarse){ .hovertip{display:none!important} }
   .link{fill:none;stroke:rgba(255,255,255,.13);stroke-width:1.3px}
   .link.crit{stroke:var(--sg-primary);stroke-width:2.2px;opacity:.9}
@@ -508,7 +508,8 @@ function render(animate){
     .attr('class',d=>'link'+(d.crit?' crit':'')).attr('marker-end',d=>d.crit?'url(#arw-c)':'url(#arw-n)')
     .attr('d',d=>edge(d));
   const node=gRoot.append('g').selectAll('g').data(G.nodes,d=>d.id).join('g')
-    .attr('class',d=>'node'+(d.crit?' crit':'')+(d.done?' done':'')+(d.unblocked?' next':'')).attr('transform',d=>`translate(${d.x},${d.y})`);
+    .attr('class',d=>'node'+(d.crit?' crit':'')+(d.done?' done':'')+(d.unblocked?' next':'')).attr('transform',d=>`translate(${d.x},${d.y})`)
+    .attr('role','img').attr('aria-label',d=>(d.name||(d._t&&d._t.label)||d.idText||d.id));
   node.append('path').attr('class','sh').attr('d',d=>nodeShape(d)).attr('fill',d=>d.color);
   node.filter(d=>d.diag).append('circle').attr('class','diagdot').attr('cx',d=>d.r*.8).attr('cy',d=>-d.r*.8).attr('r',4.5)
     .attr('fill',d=>cssv(DIAG[d.diag.sev].c));
@@ -607,7 +608,12 @@ function positionHoverTip(nodeEl){
   const el=document.getElementById('hovertip'), r=nodeEl.getBoundingClientRect();
   // limites da própria .stage (não a janela inteira) — evita invadir a aside lateral
   const stage=document.querySelector('.stage').getBoundingClientRect();
-  const tw=el.offsetWidth, th=el.offsetHeight, pad=8, gap=10;
+  const pad=8, gap=10;
+  // trava a altura ANTES de medir — conteúdo mais alto que a .stage (comum nas abas
+  // Casos de uso/Arquitetura, que mostram G.detail() completo, sem o modo compacto)
+  // vira scroll interno em vez de estourar por baixo da .stage.
+  el.style.maxHeight=Math.max(120,stage.height-2*pad)+'px';
+  const tw=el.offsetWidth, th=el.offsetHeight;
   let x=r.right+gap, y=r.top;
   if(x+tw>stage.right-pad) x=r.left-tw-gap;
   x=Math.max(stage.left+pad,Math.min(x,stage.right-tw-pad));
@@ -733,6 +739,7 @@ function drawTimelineChart(pts){
 function focusSet(){ if(!state.focus||!G._byId) return null; const f=G._byId.get(state.focus);
   return f?new Set([f.id,...f._up,...f._dn]):null; }
 function applyFilter(){ const q=state.query.trim().toLowerCase(); const usePri=state.tab!=='arch';
+  hideHoverTip(); // busca/filtro/foco podem esmaecer o nó sob o mouse — não deixa o card aberto sobre ele
   const fs=focusSet();
   gRoot.selectAll('.node').classed('faded',d=>!!(fs&&!fs.has(d.id))).style('opacity',d=>{
     if(fs&&!fs.has(d.id)) return .05;
