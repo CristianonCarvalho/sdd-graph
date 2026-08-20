@@ -101,7 +101,8 @@
   @media (hover:none),(pointer:coarse){ .hovertip{display:none!important} }
   .link{fill:none;stroke:rgba(255,255,255,.13);stroke-width:1.3px}
   .link.crit{stroke:var(--sg-primary);stroke-width:2.2px;opacity:.9}
-  .node circle,.node path.sh{stroke:rgba(0,0,0,.45);stroke-width:1.5px;cursor:pointer;transition:opacity .25s}
+  .node circle,.node path.sh{stroke:rgba(0,0,0,.45);stroke-width:1.5px;cursor:grab;transition:opacity .25s}
+  .node:active circle,.node:active path.sh{cursor:grabbing}
   .node.crit circle,.node.crit path.sh{stroke:#fff;stroke-width:2px}
   .node text.id{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;fill:#fff;pointer-events:none;text-anchor:middle;dominant-baseline:central}
   .node text.ext{font-size:11px;font-weight:600;fill:var(--sg-text-soft);pointer-events:none;dominant-baseline:central}
@@ -484,7 +485,7 @@ function nodeShape(d){
   const type = (pri&&SYM[pri])? SYM[pri] : d3.symbolCircle;
   return d3.symbol().type(type).size(d.r*d.r*3.2)();
 }
-const svg=d3.select('#svg'); let G, gRoot, zoom, pulseT;
+const svg=d3.select('#svg'); let G, gRoot, zoom, pulseT, forceSim=null, forceRefreezeT=null;
 const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const SHAPE_CHAR={P1:'▲',P2:'■',P3:'●',FOUND:'◆',SETUP:'✚',POLISH:'✖'};
 function buildFor(tab){ const sp=DATA[state.spec];
@@ -492,6 +493,11 @@ function buildFor(tab){ const sp=DATA[state.spec];
 
 function render(animate){
   clearInterval(pulseT);
+  if(forceSim){ forceSim.stop(); forceSim=null; }
+  if(forceRefreezeT){ clearTimeout(forceRefreezeT); forceRefreezeT=null; }
+  // risco residual aceito: um hashchange durante um arrasto em voo pode recriar um forceSim
+  // órfão sobre o G antigo (os listeners de mousemove do d3.drag sobrevivem à remoção do <g>);
+  // autolimitado, para sozinho em ~700ms (refreeze) ou pelo decaimento natural de alpha
   hideHoverTip(); // a seleção de nós é recriada abaixo — não deixa o card apontando pra um nó destruído
   G=layout(buildFor(state.tab));
   const dg=diagFor(DATA[state.spec],state.tab); G.nodes.forEach(n=>{ n.diag=dg.get(n.id)||null; });
@@ -518,6 +524,52 @@ function render(animate){
   node.filter(d=>d.idText).append('text').attr('class','id').text(d=>d.idText);
   if(extLabels) node.append('text').attr('class','ext').attr('x',d=>d.r+7).text(d=>trunc(d.name,22));
   node.on('mouseenter',(e,d)=>{hover(d);showHoverTip(e,d);}).on('mouseleave',()=>{hover(null);hideHoverTip();}).on('click',(e,d)=>{showDetail(d);e.stopPropagation();});
+
+  // ---- arrasto com força local nos vizinhos diretos ----
+  // simLinks/linkDist são só dados (sem timers) — calculados aqui, mas o forceSim só é
+  // criado no 1º movimento real de um arrasto (dentro de dragged), nunca em render():
+  // d3.forceSimulation dispara sozinho um tick automático na criação, e como esse render()
+  // ainda vai rodar a animação de entrada dos nós logo abaixo, um forceSim eager sobrescreveria
+  // o transform inicial (scale) antes da transição começar, zerando o efeito de entrada.
+  const neighborsOf=id=>{ const s=new Set(G._in.get(id)||[]); (G._out.get(id)||[]).forEach(x=>s.add(x)); return s; };
+  const onSimTick=()=>{ links.attr('d',d=>edge(d)); node.attr('transform',d=>`translate(${d.x},${d.y})`); };
+  const linkDist=G.links.map(l=>{ const s=G._byId.get(l.source),t=G._byId.get(l.target);
+    return (s&&t)? Math.max(40,Math.hypot(t.x-s.x,t.y-s.y)) : 80; });
+  const simLinks=G.links.map(l=>({source:l.source,target:l.target})); // cópia-sombra: nunca muta G.links
+  let dragMoved=false;
+  const dragStarted=(e,d)=>{ e.sourceEvent.stopPropagation(); hideHoverTip(); dragMoved=false; d.fx=d.x; d.fy=d.y; };
+  const dragged=(e,d)=>{
+    if(!dragMoved){
+      dragMoved=true;
+      if(forceRefreezeT){ clearTimeout(forceRefreezeT); forceRefreezeT=null; }
+      if(!forceSim){
+        G.nodes.forEach(n=>{ n.fx=n.x; n.fy=n.y; }); // todos travados = layout atual, sem diff visual em repouso
+        forceSim=d3.forceSimulation(G.nodes)
+          .force('link', d3.forceLink(simLinks).id(n=>n.id).distance((l,i)=>linkDist[i]).strength(.55))
+          .force('collide', d3.forceCollide(n=>n.r+16))
+          .alpha(0).alphaDecay(.06)
+          .on('tick', onSimTick);
+      }
+      const nb=neighborsOf(d.id);
+      G.nodes.forEach(n=>{ if(n===d) return; if(nb.has(n.id)){ n.fx=null; n.fy=null; } else { n.fx=n.x; n.fy=n.y; } });
+      d3.select(e.sourceEvent.target.closest('.node')).raise();
+      if(!reduceMotion) forceSim.alphaTarget(.35).restart();
+    }
+    d.fx=e.x; d.fy=e.y;
+    // sem alpha>0 o forceLink não desloca ninguém (alpha=0 é ponto fixo) — força um pulso
+    // síncrono de alpha, converge em poucos ticks e volta a 0 pra não deixar nada "tocando" sozinho
+    if(reduceMotion){ forceSim.alpha(1).tick(8).alpha(0); onSimTick(); }
+  };
+  const dragEnded=(e,d)=>{
+    d.fx=e.x; d.fy=e.y;
+    if(!dragMoved) return; // clique simples: não mexe na simulação, deixa o click abrir o detalhe
+    const nb=neighborsOf(d.id);
+    const refreeze=()=>{ nb.forEach(id=>{ const n=G._byId.get(id); if(n){ n.fx=n.x; n.fy=n.y; } }); drawMinimap(); };
+    if(!reduceMotion){ forceSim.alphaTarget(0); forceRefreezeT=setTimeout(()=>{ refreeze(); forceRefreezeT=null; },700); }
+    else refreeze();
+  };
+  node.call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded).clickDistance(4));
+
   svg.on('click',()=>clearDetail());
   zoom=d3.zoom().scaleExtent([.2,3]).on('zoom',ev=>{gRoot.attr('transform',ev.transform); updateMiniViewport(ev.transform);}); svg.call(zoom); fit();
   if(animate!==false && !reduceMotion){

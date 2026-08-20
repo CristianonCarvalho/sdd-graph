@@ -4,6 +4,44 @@ Todas as mudanças relevantes deste projeto. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.10.3] — 2026-08-20
+
+**Arrasto de nós com força local nos vizinhos** (`src/template.html`) — os nós do grafo,
+antes fixos (posição só calculada uma vez pelo layout em camadas), agora podem ser
+arrastados. Ao mover um nó, seus vizinhos diretos (ligados por aresta) ficam livres e
+reagem em tempo real via `d3.forceSimulation` restrita a eles — o resto do grafo permanece
+parado, preservando a leitura das camadas de dependência. Ao soltar, os vizinhos se
+acomodam e travam de novo no lugar. Validado num protótipo publicado como Artifact
+comparando esta abordagem com uma alternativa mais conservadora (mola+borracha, que
+mantém tudo parado) antes de decidir pela implementação.
+
+- Clique simples continua abrindo o painel de detalhe normalmente — a simulação só é
+  armada no primeiro movimento real de um arrasto (`clickDistance(4)` + guarda por flag),
+  nunca num clique sem deslocamento.
+- Arrastar um nó não aciona o zoom/pan do canvas (`event.sourceEvent.stopPropagation()`).
+- `d3.forceLink` é alimentado com uma cópia-sombra dos links, nunca os dados reais do
+  grafo — evita que a mutação interna do d3-force (string→objeto) quebre `applyFilter()`,
+  o destaque de cadeia em foco e o atraso da animação de entrada, que dependem de
+  `source`/`target` continuarem string pelo resto do render.
+- `prefers-reduced-motion`: reposicionamento síncrono a cada movimento (sem animação
+  contínua), com um pulso real de `alpha` para que os vizinhos de fato acompanhem.
+- Cursor `grab`/`grabbing` nos nós, mesmo padrão já usado no canvas.
+
+**Correções após revisão** (`revisor-sdd-graph`, 2 rodadas):
+- **Fallback de `prefers-reduced-motion` não movia os vizinhos**: o `tick()` síncrono
+  rodava com `alpha` travado em 0, ponto fixo em que `forceLink` não desloca nada — só
+  `forceCollide` (que ignora alpha) produzia um resíduo de ~3px. Corrigido forçando um
+  pulso de `alpha(1)` antes do burst de ticks; validado ao vivo (~54px de deslocamento
+  real após o fix, vs. ~3.6px antes).
+- **Simulação criada eagerly em todo `render()` ameaçava zerar a animação de entrada**:
+  `d3.forceSimulation()` auto-arma um tick assíncrono na própria construção, que corria o
+  risco de sobrescrever o `transform` inicial (`scale(.2)`) dos nós antes da transição de
+  entrada começar. Corrigido tornando a criação da simulação lazy — só acontece no
+  primeiro movimento real de um arrasto, nunca durante um `render()` normal.
+- Risco residual aceito e documentado em comentário: uma corrida rara entre `hashchange`
+  e um arrasto em voo pode recriar uma simulação órfã sobre dados antigos; autolimitado
+  (some em ~700ms).
+
 ## [0.10.2] — 2026-08-20
 
 **Card flutuante no hover dos nós** (`src/template.html`) — substitui o tooltip nativo do
