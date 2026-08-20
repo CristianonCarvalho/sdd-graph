@@ -4,6 +4,26 @@ Todas as mudanças relevantes deste projeto. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.10.2] — 2026-08-20
+
+**Card flutuante no hover dos nós** (`src/template.html`) — substitui o tooltip nativo do
+navegador (`<title>` do SVG: texto puro, sem formatação, sem controle de posição) por um
+card que reaproveita a mesma apresentação rica já usada no clique (`G.detail(d)`): id,
+badge de prioridade, label, fase/story, métricas, tags de requisito. Só a aba Dependências
+ganha um modo compacto (`opts.compact`) que omite as listas "Depende de"/"Pré-requisito
+de" — informação que o próprio destaque da cadeia no hover já comunica visualmente.
+
+- Sem botão de fechar (pedido explícito): aparece/some só com `mouseenter`/`mouseleave`,
+  com `pointer-events:none` — nunca captura o mouse.
+- Posicionado perto do nó (`getBoundingClientRect()`, já considera zoom/pan), com flip
+  pra esquerda e clamp dentro da área do grafo (`.stage`) — não invade o painel lateral.
+- Atraso de ~180ms na aparição (evita piscar ao varrer o grafo); some instantâneo.
+- CSS generalizado: as regras de tipografia do painel `#detail` viram a classe
+  compartilhada `.detail-card`, reaproveitada pelos dois — zero CSS duplicado.
+- Não aparece em telas de toque (`@media (hover:none),(pointer:coarse)`) nem na
+  exportação PNG/SVG (`serializeSVG()` clona só o `<svg>`, o card é um `<div>` externo).
+- Clique continua abrindo o painel completo na aside, sem mudança de comportamento.
+
 ## [0.10.1] — 2026-08-19
 
 **Robustez do adapter SpecKit contra o formato oficial atual e CRLF.** Dois problemas reais

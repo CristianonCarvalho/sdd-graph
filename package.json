@@ -1,6 +1,6 @@
 {
   "name": "sdd-graph",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Diagramas interativos de projetos Spec-Driven Development: dependências de tasks, casos de uso e arquitetura, num HTML self-contained. Lê SpecKit, Reversa e tlc-spec-driven; mais adapters no roadmap.",
   "type": "module",
   "bin": {

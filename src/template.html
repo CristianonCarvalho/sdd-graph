@@ -86,15 +86,19 @@
   .nextitem .sw{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
   .node.done circle,.node.done path.sh{stroke:var(--c-p3);stroke-width:2px}
   .node.next circle,.node.next path.sh{stroke:var(--sg-accent-2);stroke-width:2.5px}
-  #detail .empty{font-size:12px;color:var(--sg-text-softer);line-height:1.6}
-  #detail .tid{font-size:13px;font-weight:700}
-  #detail .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px;margin-left:7px;vertical-align:middle}
-  #detail .lab{font-size:12.5px;color:var(--sg-text-soft);line-height:1.55;margin:10px 0}
-  #detail .meta{font-size:11px;color:var(--sg-text-softer);margin:4px 0}
-  #detail .meta b{color:var(--sg-text-soft);font-weight:600}
-  #detail code{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--sg-accent-2);cursor:pointer}
-  #detail code:hover{text-decoration:underline}
+  .detail-card .empty{font-size:12px;color:var(--sg-text-softer);line-height:1.6}
+  .detail-card .tid{font-size:13px;font-weight:700}
+  .detail-card .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px;margin-left:7px;vertical-align:middle}
+  .detail-card .lab{font-size:12.5px;color:var(--sg-text-soft);line-height:1.55;margin:10px 0}
+  .detail-card .meta{font-size:11px;color:var(--sg-text-softer);margin:4px 0}
+  .detail-card .meta b{color:var(--sg-text-soft);font-weight:600}
+  .detail-card code{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--sg-accent-2);cursor:pointer}
+  .detail-card code:hover{text-decoration:underline}
   .frtag{display:inline-block;background:var(--sg-icon-bg);border:1px solid var(--sg-icon-border);color:var(--sg-primary);font-size:10px;font-weight:600;padding:1px 7px;border-radius:6px;margin:2px 4px 2px 0}
+  /* tooltip de hover: mesmo cartão visual do #detail (classe .detail-card), flutuante e
+     sem interação própria — só aparece/some com o hover do nó, nunca captura o mouse. */
+  .hovertip{position:fixed;z-index:50;max-width:280px;pointer-events:none;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+  @media (hover:none),(pointer:coarse){ .hovertip{display:none!important} }
   .link{fill:none;stroke:rgba(255,255,255,.13);stroke-width:1.3px}
   .link.crit{stroke:var(--sg-primary);stroke-width:2.2px;opacity:.9}
   .node circle,.node path.sh{stroke:rgba(0,0,0,.45);stroke-width:1.5px;cursor:pointer;transition:opacity .25s}
@@ -219,6 +223,7 @@
       <div class="hint" id="hint"></div>
       <div id="standup" class="ovl hide"></div>
       <div id="tlpanel" class="ovl hide"></div>
+      <div id="hovertip" class="card detail-card hovertip hide"></div>
     </div>
     <aside>
       <div class="card"><h3 id="statsTitle">Resumo</h3><div class="stats" id="stats"></div></div>
@@ -227,7 +232,7 @@
       <div class="card hide" id="diffCard"><h3>Diff do plano</h3><div id="diffBase"></div><div id="diffList"></div></div>
       <div class="card hide" id="diagCard"><h3>Diagnóstico do plano</h3><div class="diagcounts" id="diagCounts"></div><div id="diagList"></div></div>
       <div class="card"><h3 id="legTitle">Legenda</h3><div id="legend"></div><div class="legnote" id="legnote"></div></div>
-      <div class="card" id="detail"><h3>Detalhe</h3><div class="empty">Clique num nó para ver os detalhes.</div></div>
+      <div class="card detail-card" id="detail"><h3>Detalhe</h3><div class="empty">Clique num nó para ver os detalhes.</div></div>
     </aside>
   </main>
 </div>
@@ -320,16 +325,19 @@ function buildDeps(sp){
     idText:n.id.replace(/^T0*/,'T'), crit:crit.has(n.id), done:!!n.done, inProgress:!!n.inProgress,
     unblocked:(!n.done && (n.deps||[]).every(d=>doneSet.has(d))), _t:n
   })), links, kind:'deps'};
-  G.detail = nd => {
+  G.detail = (nd, opts={}) => {
     const n=nd._t; const depd=raw.filter(x=>x.deps.includes(n.id)).map(x=>x.id);
+    // compact (usado no card de hover): omite as listas de refs — a própria dimmed/
+    // highlight do hover já comunica visualmente quem depende de quem.
+    const refsHtml = opts.compact ? '' : `
+      <div class="meta"><b>Depende de:</b> ${refs(n.deps)}</div>
+      <div class="meta"><b>Pré-requisito de:</b> ${refs(depd)}</div>`;
     return `<div><span class="tid mono">${n.id}</span>
       <span class="badge" style="${badge(cssv(PRI[n.priority].c))}">${n.priority}${n.parallel?' · ∥':''}${n.done?' · ✓':''}</span></div>
       <div class="lab">${mdcode(n.label)}</div>
       <div class="meta"><b>Fase:</b> ${n.phase}${n.story?` · <b>${n.story}</b>`:''}</div>
       <div class="meta"><b>Métricas:</b> depende de ${n.deps.length} · é pré-req. de ${depd.length} · desbloqueia ${n.blocks} no total</div>
-      ${n.frs.length?`<div class="meta"><b>Requisitos:</b><br>${n.frs.map(f=>`<span class="frtag">${f}</span>`).join('')}</div>`:''}
-      <div class="meta"><b>Depende de:</b> ${refs(n.deps)}</div>
-      <div class="meta"><b>Pré-requisito de:</b> ${refs(depd)}</div>`;
+      ${n.frs.length?`<div class="meta"><b>Requisitos:</b><br>${n.frs.map(f=>`<span class="frtag">${f}</span>`).join('')}</div>`:''}${refsHtml}`;
   };
   return G;
 }
@@ -484,6 +492,7 @@ function buildFor(tab){ const sp=DATA[state.spec];
 
 function render(animate){
   clearInterval(pulseT);
+  hideHoverTip(); // a seleção de nós é recriada abaixo — não deixa o card apontando pra um nó destruído
   G=layout(buildFor(state.tab));
   const dg=diagFor(DATA[state.spec],state.tab); G.nodes.forEach(n=>{ n.diag=dg.get(n.id)||null; });
   const dfm=state.tab==='deps'?diffFor(DATA[state.spec]):null; if(dfm) G.nodes.forEach(n=>{ n.diffKind=dfm.get(n.id)||null; });
@@ -505,10 +514,9 @@ function render(animate){
     .attr('fill',d=>cssv(DIAG[d.diag.sev].c));
   node.filter(d=>d.diffKind).append('circle').attr('class','diffdot').attr('cx',d=>-d.r*.8).attr('cy',d=>-d.r*.8).attr('r',4.5)
     .attr('fill',d=>cssv(DIFFK[d.diffKind].c));
-  node.append('title').text(d=>(d.name||(d._t&&d._t.label)||d.idText||d.id));
   node.filter(d=>d.idText).append('text').attr('class','id').text(d=>d.idText);
   if(extLabels) node.append('text').attr('class','ext').attr('x',d=>d.r+7).text(d=>trunc(d.name,22));
-  node.on('mouseenter',(e,d)=>hover(d)).on('mouseleave',()=>hover(null)).on('click',(e,d)=>{showDetail(d);e.stopPropagation();});
+  node.on('mouseenter',(e,d)=>{hover(d);showHoverTip(e,d);}).on('mouseleave',()=>{hover(null);hideHoverTip();}).on('click',(e,d)=>{showDetail(d);e.stopPropagation();});
   svg.on('click',()=>clearDetail());
   zoom=d3.zoom().scaleExtent([.2,3]).on('zoom',ev=>{gRoot.attr('transform',ev.transform); updateMiniViewport(ev.transform);}); svg.call(zoom); fit();
   if(animate!==false && !reduceMotion){
@@ -575,6 +583,37 @@ function hover(d){ const nodes=gRoot.selectAll('.node'),links=gRoot.selectAll('.
   const keep=new Set([d.id,...d._up,...d._dn]);
   nodes.classed('dim',n=>!keep.has(n.id));
   links.classed('dim',l=>!(keep.has(l.source)&&keep.has(l.target))); }
+
+// ---------------- card flutuante no hover (substitui o <title> nativo do SVG) ----------------
+// Reaproveita G.detail(d) (mesmo conteúdo do painel de clique), sem botão de fechar — só
+// aparece/some com mouseenter/mouseleave do nó. pointer-events:none garante que o card
+// nunca captura o mouse (não "prende" o usuário, não precisa de UI de fechar).
+let hoverTipTimer=null;
+function showHoverTip(e,d){
+  clearTimeout(hoverTipTimer);
+  const nodeEl=e.currentTarget;
+  hoverTipTimer=setTimeout(()=>{
+    const el=document.getElementById('hovertip');
+    el.innerHTML=G.detail(d,{compact:true});
+    el.classList.remove('hide');
+    positionHoverTip(nodeEl);
+  },180);
+}
+function hideHoverTip(){
+  clearTimeout(hoverTipTimer);
+  document.getElementById('hovertip').classList.add('hide');
+}
+function positionHoverTip(nodeEl){
+  const el=document.getElementById('hovertip'), r=nodeEl.getBoundingClientRect();
+  // limites da própria .stage (não a janela inteira) — evita invadir a aside lateral
+  const stage=document.querySelector('.stage').getBoundingClientRect();
+  const tw=el.offsetWidth, th=el.offsetHeight, pad=8, gap=10;
+  let x=r.right+gap, y=r.top;
+  if(x+tw>stage.right-pad) x=r.left-tw-gap;
+  x=Math.max(stage.left+pad,Math.min(x,stage.right-tw-pad));
+  y=Math.max(stage.top+pad,Math.min(y,stage.bottom-th-pad));
+  el.style.left=x+'px'; el.style.top=y+'px';
+}
 
 function showDetail(d){ const el=document.getElementById('detail');
   const chain=(d._up&&d._up.size)||(d._dn&&d._dn.size);
